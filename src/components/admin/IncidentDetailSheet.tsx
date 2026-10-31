@@ -14,7 +14,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { updateIncident } from "@/lib/incidents.functions";
-import { STATUS_LABEL, type IncidentStatus } from "@/lib/incident-meta";
+import { PRIORITY_LABEL, STATUS_LABEL, type IncidentStatus } from "@/lib/incident-meta";
+import type { Priority } from "@/lib/priority";
 import { cn } from "@/lib/utils";
 import type { IncidentRow, StaffMember } from "./types";
 
@@ -26,6 +27,12 @@ type Props = {
 };
 
 const STATUSES: IncidentStatus[] = ["pendente", "em_andamento", "concluido"];
+const PRIORITIES: Priority[] = ["alta", "media", "baixa"];
+const priorityActiveClass: Record<Priority, string> = {
+  alta: "bg-priority-high text-primary-foreground shadow-sm",
+  media: "bg-priority-medium text-primary-foreground shadow-sm",
+  baixa: "bg-priority-low text-primary-foreground shadow-sm",
+};
 
 export function IncidentDetailSheet({ incident, photoUrl, staff, onOpenChange }: Props) {
   const update = useServerFn(updateIncident);
@@ -35,6 +42,8 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, onOpenChange }:
   const [note, setNote] = useState("");
   const [notify, setNotify] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [priority, setPriority] = useState<Priority>("media");
+  const [priorityNote, setPriorityNote] = useState("");
 
   useEffect(() => {
     if (!incident) return;
@@ -42,6 +51,8 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, onOpenChange }:
     setAssignee(incident.assigned_to ?? "none");
     setNote(incident.resolution_note ?? "");
     setNotify(true);
+    setPriority(incident.priority);
+    setPriorityNote(incident.manager_priority_note ?? "");
   }, [incident]);
 
   async function save() {
@@ -55,6 +66,9 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, onOpenChange }:
           assignedTo: assignee === "none" ? null : assignee,
           resolutionNote: note.trim() || null,
           notify,
+          ...(priority !== incident.priority || !incident.priority_confirmed || priorityNote !== (incident.manager_priority_note ?? "")
+            ? { priority, priorityNote: priorityNote.trim() || null }
+            : {}),
         },
       });
       toast.success(res.notified ? "Chamado atualizado e solicitante notificado" : "Chamado atualizado");
@@ -208,7 +222,7 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, onOpenChange }:
 
               <Button className="w-full" size="lg" onClick={save} disabled={saving}>
                 {saving && <Loader2 className="animate-spin" />}
-                {statusChanged && notify ? "Salvar e notificar" : "Salvar"}
+                {!incident.priority_confirmed ? "Confirmar prioridade e salvar" : statusChanged && notify ? "Salvar e notificar" : "Salvar"}
               </Button>
             </div>
           </>
