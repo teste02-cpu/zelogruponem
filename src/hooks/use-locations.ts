@@ -18,7 +18,8 @@ export function useLocations() {
     staleTime: 5 * 60_000,
   });
   const all = query.data ?? [];
-  const active = all.filter((l) => l.active);
+  const offBlocks = new Set(all.filter((l) => !l.room && !l.active).map((l) => l.block));
+  const active = all.filter((l) => l.active && !offBlocks.has(l.block));
   const blocks = Array.from(new Set(active.map((l) => l.block))).sort((a, b) => a.localeCompare(b, "pt-BR"));
   const roomsOf = (block: string) =>
     active

@@ -13,7 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { analyzeIncidentPhoto, createIncident, getTrackedIncidents } from "@/lib/incidents.functions";
-import { BLOCKS, CATEGORIES, parseLocationCode } from "@/lib/incident-meta";
+import { CATEGORIES, parseLocationCode } from "@/lib/incident-meta";
+import { useLocations } from "@/hooks/use-locations";
 import { addTrackedTicket, readReporter, readSeenResolved, readTrackedTickets, saveReporter } from "@/lib/tracked-tickets";
 
 export const Route = createFileRoute("/")({
@@ -35,6 +36,7 @@ function CapturePage() {
   const create = useServerFn(createIncident);
   const tracked = useServerFn(getTrackedIncidents);
 
+  const { blocks, roomsOf } = useLocations();
   const [step, setStep] = useState<Step>("camera");
   const [photo, setPhoto] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
