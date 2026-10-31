@@ -15,6 +15,13 @@
       "when": 1793473568691,
       "tag": "0001_manager_defines_priority",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793474687802,
+      "tag": "0002_anonymous_reports",
+      "breakpoints": true
     }
   ]
 }
