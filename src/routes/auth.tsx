@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Camera, Loader2 } from "lucide-react";
@@ -13,14 +13,14 @@ import { lovable } from "@/integrations/lovable";
 type Search = { redirect?: string | undefined };
 
 function safePath(value: unknown): string {
-  if (typeof value !== "string") return "/";
+  if (typeof value !== "string") return "/admin";
   try {
     const url = new URL(value, "http://x");
-    if (value.startsWith("http") && typeof window !== "undefined" && url.origin !== window.location.origin) return "/";
+    if (value.startsWith("http") && typeof window !== "undefined" && url.origin !== window.location.origin) return "/admin";
     const path = url.pathname + url.search;
-    return path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/auth") ? path : "/";
+    return path.startsWith("/") && !path.startsWith("//") && !path.startsWith("/auth") && path !== "/" ? path : "/admin";
   } catch {
-    return "/";
+    return "/admin";
   }
 }
 
@@ -30,10 +30,10 @@ export const Route = createFileRoute("/auth")({
   }),
   head: () => ({
     meta: [
-      { title: "Entrar · Zelo" },
-      { name: "description", content: "Acesse o Zelo com sua conta institucional para registrar ocorrências no campus." },
-      { property: "og:title", content: "Entrar · Zelo" },
-      { property: "og:description", content: "Acesse o Zelo com sua conta institucional." },
+      { title: "Área da equipe · Zelo" },
+      { name: "description", content: "Acesso dos gestores e da equipe de manutenção ao painel de chamados do Zelo." },
+      { property: "og:title", content: "Área da equipe · Zelo" },
+      { property: "og:description", content: "Acesso dos gestores e da equipe de manutenção do campus." },
     ],
   }),
   component: AuthPage,
@@ -106,12 +106,15 @@ function AuthPage() {
             <span className="font-display text-2xl font-extrabold">zelo</span>
           </div>
           <h1 className="mt-10 text-4xl font-extrabold leading-[1.05]">
-            Viu um problema no campus?
-            <span className="block text-primary">Uma foto resolve.</span>
+            Área da equipe
+            <span className="block text-primary">Gestão de chamados.</span>
           </h1>
           <p className="mt-4 text-muted-foreground">
-            Entre com sua conta institucional. Seu nome é preenchido automaticamente em cada registro.
+            Acesso exclusivo para gestores e equipe de manutenção. Para registrar um problema não é preciso entrar.
           </p>
+          <Link to="/" className="mt-3 inline-block text-sm font-medium text-primary underline-offset-4 hover:underline">
+            ← Registrar um problema sem login
+          </Link>
         </div>
 
         <div className="mt-10 space-y-4">
