@@ -14,16 +14,166 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      incidents: {
+        Row: {
+          assigned_to: string | null
+          block: string | null
+          category: string
+          created_at: string
+          description: string
+          id: string
+          location: string
+          photo_path: string | null
+          priority: Database["public"]["Enums"]["incident_priority"]
+          priority_reason: string | null
+          reporter_name: string
+          resolution_note: string | null
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["incident_status"]
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          block?: string | null
+          category: string
+          created_at?: string
+          description: string
+          id?: string
+          location: string
+          photo_path?: string | null
+          priority?: Database["public"]["Enums"]["incident_priority"]
+          priority_reason?: string | null
+          reporter_name: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["incident_status"]
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_to?: string | null
+          block?: string | null
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          location?: string
+          photo_path?: string | null
+          priority?: Database["public"]["Enums"]["incident_priority"]
+          priority_reason?: string | null
+          reporter_name?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["incident_status"]
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incidents_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          incident_id: string | null
+          message: string
+          read: boolean
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          incident_id?: string | null
+          message: string
+          read?: boolean
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          incident_id?: string | null
+          message?: string
+          read?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_staff: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "maintenance" | "user"
+      incident_priority: "alta" | "media" | "baixa"
+      incident_status: "pendente" | "em_andamento" | "concluido"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +300,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "maintenance", "user"],
+      incident_priority: ["alta", "media", "baixa"],
+      incident_status: ["pendente", "em_andamento", "concluido"],
+    },
   },
 } as const
