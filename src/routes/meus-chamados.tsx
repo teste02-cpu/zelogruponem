@@ -10,7 +10,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { useSignedUrls } from "@/hooks/use-signed-urls";
 import { supabase } from "@/integrations/supabase/client";
 
-export const Route = createFileRoute("/_authenticated/meus-chamados")({
+export const Route = createFileRoute("/meus-chamados")({
   head: () => ({
     meta: [
       { title: "Meus chamados · Zelo" },
