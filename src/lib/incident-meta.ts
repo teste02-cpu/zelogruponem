@@ -18,7 +18,6 @@ export const CATEGORIES = [
   "Outros",
 ] as const;
 
-export const BLOCKS = ["Bloco A", "Bloco B", "Bloco C", "Bloco D", "Bloco E", "Biblioteca", "Área Externa"] as const;
 
 export const PRIORITY_LABEL: Record<Priority, string> = { alta: "Alta", media: "Média", baixa: "Baixa" };
 export const STATUS_LABEL: Record<IncidentStatus, string> = {

@@ -6,6 +6,8 @@ import { Camera, Columns3, List, LogOut, Search } from "lucide-react";
 import { IncidentCard } from "@/components/admin/IncidentCard";
 import { IncidentDetailSheet } from "@/components/admin/IncidentDetailSheet";
 import { TeamDialog } from "@/components/admin/TeamDialog";
+import { LocationsDialog } from "@/components/admin/LocationsDialog";
+import { useLocations } from "@/hooks/use-locations";
 import type { IncidentRow, StaffMember } from "@/components/admin/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useSignedUrls } from "@/hooks/use-signed-urls";
 import { supabase } from "@/integrations/supabase/client";
-import { BLOCKS, PRIORITY_LABEL, PRIORITY_RANK, STATUS_LABEL, type IncidentStatus } from "@/lib/incident-meta";
+import { PRIORITY_LABEL, PRIORITY_RANK, STATUS_LABEL, type IncidentStatus } from "@/lib/incident-meta";
 import type { Priority } from "@/lib/priority";
 import { cn } from "@/lib/utils";
 
@@ -84,6 +86,12 @@ function AdminDashboard() {
     };
   }, [qc]);
 
+  const { blocks: registeredBlocks } = useLocations();
+  const blockOptions = useMemo(
+    () => Array.from(new Set([...registeredBlocks, ...incidents.map((i) => i.block).filter((b): b is string => !!b)])).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [registeredBlocks, incidents],
+  );
+
   const staffName = useMemo(() => Object.fromEntries(staff.map((s) => [s.id, s.name])), [staff]);
   const { data: urls = {} } = useSignedUrls(incidents.map((i) => i.photo_path));
 
@@ -133,6 +141,7 @@ function AdminDashboard() {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <LocationsDialog />
             {me?.isAdmin && <TeamDialog />}
             <Button variant="outline" size="sm" asChild>
               <Link to="/">
@@ -181,7 +190,7 @@ function AdminDashboard() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os locais</SelectItem>
-                {BLOCKS.map((b) => (
+                {blockOptions.map((b) => (
                   <SelectItem key={b} value={b}>
                     {b}
                   </SelectItem>

@@ -13,7 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { analyzeIncidentPhoto, createIncident, getTrackedIncidents } from "@/lib/incidents.functions";
-import { BLOCKS, CATEGORIES, parseLocationCode } from "@/lib/incident-meta";
+import { CATEGORIES, parseLocationCode } from "@/lib/incident-meta";
+import { useLocations } from "@/hooks/use-locations";
 import { addTrackedTicket, readReporter, readSeenResolved, readTrackedTickets, saveReporter } from "@/lib/tracked-tickets";
 
 export const Route = createFileRoute("/")({
@@ -35,6 +36,7 @@ function CapturePage() {
   const create = useServerFn(createIncident);
   const tracked = useServerFn(getTrackedIncidents);
 
+  const { blocks, roomsOf } = useLocations();
   const [step, setStep] = useState<Step>("camera");
   const [photo, setPhoto] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -231,14 +233,24 @@ function CapturePage() {
                     <SelectValue placeholder="Bloco" />
                   </SelectTrigger>
                   <SelectContent className="dark">
-                    {BLOCKS.map((b) => (
+                    {(block && !blocks.includes(block) ? [block, ...blocks] : blocks).map((b) => (
                       <SelectItem key={b} value={b}>
                         {b}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Input placeholder="Sala 05, Banheiro 2º andar…" value={room} onChange={(e) => setRoom(e.target.value)} />
+                <Input
+                  list="room-options"
+                  placeholder={block && roomsOf(block).length ? "Escolha ou digite a sala" : "Sala 05, Banheiro 2º andar…"}
+                  value={room}
+                  onChange={(e) => setRoom(e.target.value)}
+                />
+                <datalist id="room-options">
+                  {(block ? roomsOf(block) : []).map((r) => (
+                    <option key={r} value={r} />
+                  ))}
+                </datalist>
               </div>
             </div>
 
