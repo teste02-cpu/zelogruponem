@@ -116,6 +116,30 @@ export type Database = {
           },
         ]
       }
+      locations: {
+        Row: {
+          active: boolean
+          block: string
+          created_at: string
+          id: string
+          room: string | null
+        }
+        Insert: {
+          active?: boolean
+          block: string
+          created_at?: string
+          id?: string
+          room?: string | null
+        }
+        Update: {
+          active?: boolean
+          block?: string
+          created_at?: string
+          id?: string
+          room?: string | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
