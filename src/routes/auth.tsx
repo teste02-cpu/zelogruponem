@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 
-type Search = { redirect?: string };
+type Search = { redirect?: string | undefined };
 
 function safePath(value: unknown): string {
   if (typeof value !== "string") return "/";
@@ -26,7 +26,7 @@ function safePath(value: unknown): string {
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>): Search => ({
-    redirect: typeof s.redirect === "string" ? s.redirect : undefined,
+    redirect: typeof s["redirect"] === "string" ? s["redirect"] : undefined,
   }),
   head: () => ({
     meta: [

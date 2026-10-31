@@ -20,7 +20,7 @@ import type { IncidentRow, StaffMember } from "./types";
 
 type Props = {
   incident: IncidentRow | null;
-  photoUrl?: string;
+  photoUrl?: string | undefined;
   staff: StaffMember[];
   onOpenChange: (open: boolean) => void;
 };

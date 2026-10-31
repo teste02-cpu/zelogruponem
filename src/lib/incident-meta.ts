@@ -41,7 +41,7 @@ export function parseLocationCode(raw: string): { block: string | null; room: st
   text = decodeURIComponent(text).replace(/[|_]/g, " - ").replace(/\s+/g, " ").trim();
   const match = text.match(/bloco[\s-]*([a-z0-9]+)/i);
   if (match) {
-    const block = `Bloco ${match[1].toUpperCase()}`;
+    const block = `Bloco ${(match[1] ?? "").toUpperCase()}`;
     const room = text
       .replace(match[0], "")
       .replace(/^[\s\-–,:]+/, "")

@@ -100,8 +100,14 @@ function CapturePage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!photo || !me) return;
-    if (!block && !room.trim()) return toast.error("Informe a localização.");
-    if (description.trim().length < 5) return toast.error("Descreva o problema.");
+    if (!block && !room.trim()) {
+      toast.error("Informe a localização.");
+      return;
+    }
+    if (description.trim().length < 5) {
+      toast.error("Descreva o problema.");
+      return;
+    }
     setSubmitting(true);
     try {
       const path = `${me.id}/${crypto.randomUUID()}.jpg`;

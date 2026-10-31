@@ -33,7 +33,7 @@ export async function runStructured<T>(opts: {
   schema: Record<string, unknown>;
   effort?: "low" | "medium";
 }): Promise<T> {
-  const apiKey = process.env.LOVABLE_API_KEY;
+  const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey) throw new AiGatewayError(friendlyMessage(401), 401);
 
   const runIdFetch = createLovableAiGatewayRunIdFetch();

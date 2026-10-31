@@ -28,7 +28,10 @@ export function TeamDialog() {
     const { error } = on
       ? await supabase.from("user_roles").insert({ user_id: userId, role: "maintenance" })
       : await supabase.from("user_roles").delete().eq("user_id", userId).eq("role", "maintenance");
-    if (error) return toast.error("Não foi possível alterar a equipe.");
+    if (error) {
+      toast.error("Não foi possível alterar a equipe.");
+      return;
+    }
     qc.invalidateQueries({ queryKey: ["team-people"] });
     qc.invalidateQueries({ queryKey: ["staff"] });
   }

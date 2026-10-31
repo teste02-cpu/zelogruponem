@@ -8,8 +8,8 @@ import type { IncidentRow } from "./types";
 
 type Props = {
   incident: IncidentRow;
-  photoUrl?: string;
-  assigneeName?: string;
+  photoUrl?: string | undefined;
+  assigneeName?: string | undefined;
   onOpen: () => void;
   showStatus?: boolean;
 };
