@@ -6,6 +6,7 @@ import { normalizeOptionalEmail } from "./rate-limit";
 
 const MAX_IMAGE_CHARS = 8_000_000;
 const IMAGE_RE = /^data:image\/(jpeg|png|webp);base64,/;
+const ANONYMOUS_USER_ID = "00000000-0000-0000-0000-000000000000";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function checkImage(value: unknown): string {
@@ -215,10 +216,15 @@ export const updateIncident = createServerFn({ method: "POST" })
         data.status === "concluido"
           ? `Seu chamado "${current.title}" (${current.location}) foi resolvido.${data.resolutionNote ? ` Nota da equipe: ${data.resolutionNote}` : ""}`
           : `Seu chamado "${current.title}" (${current.location}) está em atendimento pela equipe de manutenção.`;
-      const { error: nErr } = await supabase
-        .from("notifications")
-        .insert({ user_id: current.user_id, incident_id: current.id, message });
-      notified = !nErr;
+      if (current.user_id === ANONYMOUS_USER_ID) {
+        // Login-free reporter: the new status shows up in "Meus chamados" on their device.
+        notified = true;
+      } else {
+        const { error: nErr } = await supabase
+          .from("notifications")
+          .insert({ user_id: current.user_id, incident_id: current.id, message });
+        notified = !nErr;
+      }
     }
     return { ok: true, notified };
   });
