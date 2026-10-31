@@ -90,12 +90,58 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, onOpenChange }:
                 </a>
               )}
 
-              <div className="rounded-xl border border-primary/30 bg-accent p-3">
-                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-accent-foreground">
-                  <Sparkles className="size-3.5" /> Por que esta prioridade?
-                </p>
-                <p className="mt-1 text-sm text-accent-foreground">{incident.priority_reason ?? "Sem justificativa."}</p>
-              </div>
+              <section className="space-y-3 rounded-xl border p-3">
+                <div className="rounded-lg bg-accent p-3">
+                  <p className="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wider text-accent-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="size-3.5" /> Análise da IA
+                    </span>
+                    {incident.ai_priority && <PriorityBadge priority={incident.ai_priority} />}
+                  </p>
+                  <p className="mt-1.5 text-sm text-accent-foreground">
+                    {incident.ai_priority_reason ?? incident.priority_reason ?? "Sem análise disponível."}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center justify-between">
+                    Prioridade definida pelo gestor
+                    {!incident.priority_confirmed && (
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-priority-medium">Aguardando triagem</span>
+                    )}
+                  </Label>
+                  <div className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1">
+                    {PRIORITIES.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPriority(p)}
+                        className={cn(
+                          "rounded-md px-2 py-2 text-xs font-semibold transition",
+                          priority === p ? priorityActiveClass[p] : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {PRIORITY_LABEL[p]}
+                      </button>
+                    ))}
+                  </div>
+                  {incident.ai_priority && priority !== incident.ai_priority && (
+                    <p className="text-xs text-muted-foreground">Diferente da sugestão da IA — registre o motivo abaixo.</p>
+                  )}
+                  <Textarea
+                    rows={2}
+                    value={priorityNote}
+                    onChange={(e) => setPriorityNote(e.target.value)}
+                    placeholder="Motivo da decisão (opcional)"
+                  />
+                  {incident.priority_confirmed && incident.priority_set_at && (
+                    <p className="text-xs text-muted-foreground">
+                      Definida por {staff.find((s) => s.id === incident.priority_set_by)?.name ?? "gestor"} em{" "}
+                      {format(new Date(incident.priority_set_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                    </p>
+                  )}
+                </div>
+              </section>
 
               <dl className="grid grid-cols-2 gap-3 text-sm">
                 <Info label="Local" value={incident.location} />
