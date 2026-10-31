@@ -190,9 +190,32 @@ function CapturePage() {
           <div className="space-y-4 px-4 pb-32 pt-5">
             {aiNote && <p className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground">{aiNote}</p>}
 
-            <div className="space-y-1.5">
-              <Label>Solicitante</Label>
-              <Input value={me?.name ?? ""} readOnly className="bg-muted text-muted-foreground" />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="reporter-name">
+                  Seu nome <span className="font-normal text-muted-foreground">(opcional)</span>
+                </Label>
+                <Input
+                  id="reporter-name"
+                  value={reporterName}
+                  onChange={(e) => setReporterName(e.target.value)}
+                  placeholder="Pode deixar em branco"
+                  autoComplete="name"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="reporter-email">
+                  E-mail <span className="font-normal text-muted-foreground">(opcional)</span>
+                </Label>
+                <Input
+                  id="reporter-email"
+                  type="email"
+                  value={reporterEmail}
+                  onChange={(e) => setReporterEmail(e.target.value)}
+                  placeholder="Para receber o aviso de resolução"
+                  autoComplete="email"
+                />
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -276,7 +299,8 @@ function CapturePage() {
           </span>
           <h1 className="text-3xl font-extrabold">Ocorrência registrada</h1>
           <p className="text-muted-foreground">
-            A equipe de manutenção já recebeu seu chamado. Você será avisado aqui quando for resolvido.
+            A equipe de manutenção já recebeu seu chamado. Acompanhe o andamento em "Meus chamados" neste aparelho
+            {sentWithEmail ? " — e avisaremos no seu e-mail quando for resolvido." : "."}
           </p>
           {protocol && <p className="font-mono text-sm text-muted-foreground">Protocolo #{protocol}</p>}
           <div className="mt-4 flex w-full max-w-xs flex-col gap-2">
