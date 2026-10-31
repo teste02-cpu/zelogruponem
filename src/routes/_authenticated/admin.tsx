@@ -40,7 +40,7 @@ function AdminDashboard() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [view, setView] = useState<"kanban" | "lista">("kanban");
-  const [priority, setPriority] = useState<"all" | Priority>("all");
+  const [priority, setPriority] = useState<"all" | "triagem" | Priority>("all");
   const [block, setBlock] = useState<string>("all");
   const [status, setStatus] = useState<"all" | IncidentStatus>("all");
   const [search, setSearch] = useState("");
@@ -90,7 +90,7 @@ function AdminDashboard() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return incidents
-      .filter((i) => priority === "all" || i.priority === priority)
+      .filter((i) => priority === "all" || (priority === "triagem" ? !i.priority_confirmed : i.priority_confirmed && i.priority === priority))
       .filter((i) => block === "all" || i.block === block)
       .filter((i) => status === "all" || i.status === status)
       .filter(
@@ -98,7 +98,7 @@ function AdminDashboard() {
           !q ||
           [i.title, i.description, i.location, i.reporter_name, i.category].some((f) => f?.toLowerCase().includes(q)),
       )
-      .sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || +new Date(b.created_at) - +new Date(a.created_at));
+      .sort((a, b) => Number(a.priority_confirmed) - Number(b.priority_confirmed) || PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || +new Date(b.created_at) - +new Date(a.created_at));
   }, [incidents, priority, block, status, search]);
 
   const stats = useMemo(() => {
@@ -106,7 +106,8 @@ function AdminDashboard() {
     const today = new Date().toDateString();
     return {
       open: open.length,
-      high: open.filter((i) => i.priority === "alta").length,
+      high: open.filter((i) => i.priority_confirmed && i.priority === "alta").length,
+      triage: open.filter((i) => !i.priority_confirmed).length,
       progress: incidents.filter((i) => i.status === "em_andamento").length,
       doneToday: incidents.filter((i) => i.resolved_at && new Date(i.resolved_at).toDateString() === today).length,
     };
@@ -146,8 +147,9 @@ function AdminDashboard() {
       </header>
 
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-6">
-        <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <section className="grid grid-cols-2 gap-3 md:grid-cols-5">
           <Stat label="Abertos" value={stats.open} />
+          <Stat label="Aguardando triagem" value={stats.triage} tone="medium" />
           <Stat label="Alta prioridade" value={stats.high} tone="high" />
           <Stat label="Em andamento" value={stats.progress} />
           <Stat label="Concluídos hoje" value={stats.doneToday} tone="low" />
@@ -165,6 +167,7 @@ function AdminDashboard() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toda prioridade</SelectItem>
+                <SelectItem value="triagem">Aguardando triagem</SelectItem>
                 {(["alta", "media", "baixa"] as Priority[]).map((p) => (
                   <SelectItem key={p} value={p}>
                     {PRIORITY_LABEL[p]}
@@ -262,7 +265,7 @@ function AdminDashboard() {
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: number; tone?: "high" | "low" }) {
+function Stat({ label, value, tone }: { label: string; value: number; tone?: "high" | "medium" | "low" }) {
   return (
     <div className="rounded-2xl border bg-card p-4 shadow-card">
       <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
@@ -270,6 +273,7 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: "hi
         className={cn(
           "mt-1 font-display text-4xl font-extrabold",
           tone === "high" && "text-priority-high",
+          tone === "medium" && "text-priority-medium",
           tone === "low" && "text-priority-low",
         )}
       >

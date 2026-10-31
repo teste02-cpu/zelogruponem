@@ -8,6 +8,13 @@
       "when": 1793472388240,
       "tag": "0000_incidents_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793473568691,
+      "tag": "0001_manager_defines_priority",
+      "breakpoints": true
     }
   ]
 }

@@ -11,7 +11,7 @@
 
 ## Project rules
 - Incidents are inserted only by the `createIncident` server function (service role); there is no INSERT policy for users, so AI-computed priority cannot be forged from the browser.
-- Priority = AI verdict passed through `finalizePriority` in `src/lib/priority.ts`; the deterministic rule may raise to ALTA but never lowers it, and is the fallback when AI fails. Keep `priority.test.ts` in sync.
+- AI only SUGGESTS priority (`ai_priority`, `ai_priority_reason`, via `finalizePriority` in `src/lib/priority.ts`; rule may raise to ALTA, is fallback when AI fails). The manager defines the final `priority` in the dashboard (`priority_confirmed`, `priority_set_by`). Keep `priority.test.ts` in sync.
 - AI calls live in `src/lib/ai/*.server.ts` (Responses API, streamed structured output) and are loaded via dynamic import inside server-function handlers.
 - Incident photos are in the private `incident-photos` bucket under `{userId}/…`; UI shows them through signed URLs.
 - Staff = `admin` or `maintenance` role (`is_staff()`); the first account to sign up becomes admin via the signup trigger.

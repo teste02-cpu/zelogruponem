@@ -16,6 +16,8 @@ export type Database = {
     Tables: {
       incidents: {
         Row: {
+          ai_priority: Database["public"]["Enums"]["incident_priority"] | null
+          ai_priority_reason: string | null
           assigned_to: string | null
           block: string | null
           category: string
@@ -23,9 +25,13 @@ export type Database = {
           description: string
           id: string
           location: string
+          manager_priority_note: string | null
           photo_path: string | null
           priority: Database["public"]["Enums"]["incident_priority"]
+          priority_confirmed: boolean
           priority_reason: string | null
+          priority_set_at: string | null
+          priority_set_by: string | null
           reporter_name: string
           resolution_note: string | null
           resolved_at: string | null
@@ -35,6 +41,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ai_priority?: Database["public"]["Enums"]["incident_priority"] | null
+          ai_priority_reason?: string | null
           assigned_to?: string | null
           block?: string | null
           category: string
@@ -42,9 +50,13 @@ export type Database = {
           description: string
           id?: string
           location: string
+          manager_priority_note?: string | null
           photo_path?: string | null
           priority?: Database["public"]["Enums"]["incident_priority"]
+          priority_confirmed?: boolean
           priority_reason?: string | null
+          priority_set_at?: string | null
+          priority_set_by?: string | null
           reporter_name: string
           resolution_note?: string | null
           resolved_at?: string | null
@@ -54,6 +66,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ai_priority?: Database["public"]["Enums"]["incident_priority"] | null
+          ai_priority_reason?: string | null
           assigned_to?: string | null
           block?: string | null
           category?: string
@@ -61,9 +75,13 @@ export type Database = {
           description?: string
           id?: string
           location?: string
+          manager_priority_note?: string | null
           photo_path?: string | null
           priority?: Database["public"]["Enums"]["incident_priority"]
+          priority_confirmed?: boolean
           priority_reason?: string | null
+          priority_set_at?: string | null
+          priority_set_by?: string | null
           reporter_name?: string
           resolution_note?: string | null
           resolved_at?: string | null
@@ -76,6 +94,13 @@ export type Database = {
           {
             foreignKeyName: "incidents_assigned_to_fkey"
             columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidents_priority_set_by_fkey"
+            columns: ["priority_set_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

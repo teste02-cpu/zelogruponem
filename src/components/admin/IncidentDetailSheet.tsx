@@ -14,7 +14,8 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { updateIncident } from "@/lib/incidents.functions";
-import { STATUS_LABEL, type IncidentStatus } from "@/lib/incident-meta";
+import { PRIORITY_LABEL, STATUS_LABEL, type IncidentStatus } from "@/lib/incident-meta";
+import type { Priority } from "@/lib/priority";
 import { cn } from "@/lib/utils";
 import type { IncidentRow, StaffMember } from "./types";
 
@@ -26,6 +27,12 @@ type Props = {
 };
 
 const STATUSES: IncidentStatus[] = ["pendente", "em_andamento", "concluido"];
+const PRIORITIES: Priority[] = ["alta", "media", "baixa"];
+const priorityActiveClass: Record<Priority, string> = {
+  alta: "bg-priority-high text-primary-foreground shadow-sm",
+  media: "bg-priority-medium text-primary-foreground shadow-sm",
+  baixa: "bg-priority-low text-primary-foreground shadow-sm",
+};
 
 export function IncidentDetailSheet({ incident, photoUrl, staff, onOpenChange }: Props) {
   const update = useServerFn(updateIncident);
@@ -35,6 +42,8 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, onOpenChange }:
   const [note, setNote] = useState("");
   const [notify, setNotify] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [priority, setPriority] = useState<Priority>("media");
+  const [priorityNote, setPriorityNote] = useState("");
 
   useEffect(() => {
     if (!incident) return;
@@ -42,6 +51,8 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, onOpenChange }:
     setAssignee(incident.assigned_to ?? "none");
     setNote(incident.resolution_note ?? "");
     setNotify(true);
+    setPriority(incident.priority);
+    setPriorityNote(incident.manager_priority_note ?? "");
   }, [incident]);
 
   async function save() {
@@ -55,6 +66,9 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, onOpenChange }:
           assignedTo: assignee === "none" ? null : assignee,
           resolutionNote: note.trim() || null,
           notify,
+          ...(priority !== incident.priority || !incident.priority_confirmed || priorityNote !== (incident.manager_priority_note ?? "")
+            ? { priority, priorityNote: priorityNote.trim() || null }
+            : {}),
         },
       });
       toast.success(res.notified ? "Chamado atualizado e solicitante notificado" : "Chamado atualizado");
@@ -90,12 +104,58 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, onOpenChange }:
                 </a>
               )}
 
-              <div className="rounded-xl border border-primary/30 bg-accent p-3">
-                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-accent-foreground">
-                  <Sparkles className="size-3.5" /> Por que esta prioridade?
-                </p>
-                <p className="mt-1 text-sm text-accent-foreground">{incident.priority_reason ?? "Sem justificativa."}</p>
-              </div>
+              <section className="space-y-3 rounded-xl border p-3">
+                <div className="rounded-lg bg-accent p-3">
+                  <p className="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wider text-accent-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="size-3.5" /> Análise da IA
+                    </span>
+                    {incident.ai_priority && <PriorityBadge priority={incident.ai_priority} />}
+                  </p>
+                  <p className="mt-1.5 text-sm text-accent-foreground">
+                    {incident.ai_priority_reason ?? incident.priority_reason ?? "Sem análise disponível."}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center justify-between">
+                    Prioridade definida pelo gestor
+                    {!incident.priority_confirmed && (
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-priority-medium">Aguardando triagem</span>
+                    )}
+                  </Label>
+                  <div className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1">
+                    {PRIORITIES.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPriority(p)}
+                        className={cn(
+                          "rounded-md px-2 py-2 text-xs font-semibold transition",
+                          priority === p ? priorityActiveClass[p] : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {PRIORITY_LABEL[p]}
+                      </button>
+                    ))}
+                  </div>
+                  {incident.ai_priority && priority !== incident.ai_priority && (
+                    <p className="text-xs text-muted-foreground">Diferente da sugestão da IA — registre o motivo abaixo.</p>
+                  )}
+                  <Textarea
+                    rows={2}
+                    value={priorityNote}
+                    onChange={(e) => setPriorityNote(e.target.value)}
+                    placeholder="Motivo da decisão (opcional)"
+                  />
+                  {incident.priority_confirmed && incident.priority_set_at && (
+                    <p className="text-xs text-muted-foreground">
+                      Definida por {staff.find((s) => s.id === incident.priority_set_by)?.name ?? "gestor"} em{" "}
+                      {format(new Date(incident.priority_set_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                    </p>
+                  )}
+                </div>
+              </section>
 
               <dl className="grid grid-cols-2 gap-3 text-sm">
                 <Info label="Local" value={incident.location} />
@@ -162,7 +222,7 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, onOpenChange }:
 
               <Button className="w-full" size="lg" onClick={save} disabled={saving}>
                 {saving && <Loader2 className="animate-spin" />}
-                {statusChanged && notify ? "Salvar e notificar" : "Salvar"}
+                {!incident.priority_confirmed ? "Confirmar prioridade e salvar" : statusChanged && notify ? "Salvar e notificar" : "Salvar"}
               </Button>
             </div>
           </>
