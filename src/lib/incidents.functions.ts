@@ -83,8 +83,12 @@ export const createIncident = createServerFn({ method: "POST" })
         category: data.category,
         title: data.title,
         description: data.description,
+        // AI only suggests; the manager confirms or changes it in the dashboard.
         priority: verdict.priority,
-        priority_reason: verdict.source === "ia" ? verdict.justification : `${verdict.justification} (IA indisponível)`,
+        priority_reason: null,
+        ai_priority: verdict.priority,
+        ai_priority_reason: verdict.source === "ia" ? verdict.justification : `${verdict.justification} (IA indisponível)`,
+        priority_confirmed: false,
       })
       .select("id, priority")
       .single();
@@ -97,6 +101,8 @@ export const createIncident = createServerFn({ method: "POST" })
 
 type UpdateIncidentInput = {
   id: string;
+  priority?: "alta" | "media" | "baixa";
+  priorityNote?: string | null;
   status?: IncidentStatus;
   assignedTo?: string | null;
   resolutionNote?: string | null;
@@ -110,6 +116,9 @@ export const updateIncident = createServerFn({ method: "POST" })
     if (!input?.id) throw new Error("Chamado inválido.");
     if (input.status && !["pendente", "em_andamento", "concluido"].includes(input.status)) {
       throw new Error("Status inválido.");
+    }
+    if (input.priority && !["alta", "media", "baixa"].includes(input.priority)) {
+      throw new Error("Prioridade inválida.");
     }
     return input;
   })
@@ -125,7 +134,23 @@ export const updateIncident = createServerFn({ method: "POST" })
       .single();
     if (readErr || !current) throw new Error("Chamado não encontrado.");
 
-    const patch: { status?: IncidentStatus; assigned_to?: string | null; resolution_note?: string | null } = {};
+    const patch: {
+      status?: IncidentStatus;
+      assigned_to?: string | null;
+      resolution_note?: string | null;
+      priority?: "alta" | "media" | "baixa";
+      priority_confirmed?: boolean;
+      priority_set_by?: string;
+      priority_set_at?: string;
+      manager_priority_note?: string | null;
+    } = {};
+    if (data.priority) {
+      patch.priority = data.priority;
+      patch.priority_confirmed = true;
+      patch.priority_set_by = userId;
+      patch.priority_set_at = new Date().toISOString();
+      patch.manager_priority_note = data.priorityNote?.trim().slice(0, 1000) || null;
+    }
     if (data.status) patch.status = data.status;
     if (data.assignedTo !== undefined) patch.assigned_to = data.assignedTo;
     if (data.resolutionNote !== undefined) patch.resolution_note = data.resolutionNote?.slice(0, 1000) ?? null;
