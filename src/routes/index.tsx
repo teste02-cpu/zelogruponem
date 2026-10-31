@@ -233,14 +233,24 @@ function CapturePage() {
                     <SelectValue placeholder="Bloco" />
                   </SelectTrigger>
                   <SelectContent className="dark">
-                    {BLOCKS.map((b) => (
+                    {(block && !blocks.includes(block) ? [block, ...blocks] : blocks).map((b) => (
                       <SelectItem key={b} value={b}>
                         {b}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Input placeholder="Sala 05, Banheiro 2º andar…" value={room} onChange={(e) => setRoom(e.target.value)} />
+                <Input
+                  list="room-options"
+                  placeholder={block && roomsOf(block).length ? "Escolha ou digite a sala" : "Sala 05, Banheiro 2º andar…"}
+                  value={room}
+                  onChange={(e) => setRoom(e.target.value)}
+                />
+                <datalist id="room-options">
+                  {(block ? roomsOf(block) : []).map((r) => (
+                    <option key={r} value={r} />
+                  ))}
+                </datalist>
               </div>
             </div>
 
