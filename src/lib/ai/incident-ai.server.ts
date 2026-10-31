@@ -22,6 +22,8 @@ const analysisSchema = {
 };
 
 export async function analyzePhoto(imageDataUrl: string): Promise<PhotoAnalysis> {
+  const [, mediaType = "image/jpeg", base64 = ""] = imageDataUrl.match(/^data:(image\/[a-z]+);base64,(.+)$/) ?? [];
+  if (!base64) throw new Error("Imagem inválida");
   const result = await runStructured<PhotoAnalysis>({
     instructions: `Você é um técnico de manutenção predial de uma universidade brasileira.
 Analise a foto enviada por um colaborador e identifique o problema de infraestrutura visível.
