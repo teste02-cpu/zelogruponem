@@ -10,9 +10,9 @@
 <!-- LOVABLE:END -->
 
 ## Project rules
-- Incidents are inserted only by the `createIncident` server function (service role); there is no INSERT policy for users, so AI-computed priority cannot be forged from the browser.
+- Reporting is login-free: `analyzeIncidentPhoto`/`createIncident` are public server functions protected by a per-hashed-IP hourly limit (`src/lib/rate-limit*.ts`, `request_log` table, service-role only). Incidents are inserted only by `createIncident` (service role); anonymous rows use the all-zero `user_id`. Reporters follow tickets via `tracking_token`s kept in localStorage (`src/lib/tracked-tickets.ts`) and `getTrackedIncidents`. Only staff sign in (`/auth` → `/admin`).
 - AI only SUGGESTS priority (`ai_priority`, `ai_priority_reason`, via `finalizePriority` in `src/lib/priority.ts`; rule may raise to ALTA, is fallback when AI fails). The manager defines the final `priority` in the dashboard (`priority_confirmed`, `priority_set_by`). Keep `priority.test.ts` in sync.
 - AI calls live in `src/lib/ai/*.server.ts` (Responses API, streamed structured output) and are loaded via dynamic import inside server-function handlers.
-- Incident photos are in the private `incident-photos` bucket under `{userId}/…`; UI shows them through signed URLs.
+- Incident photos are uploaded by the server into the private `incident-photos` bucket under `anon/…` (older ones under `{userId}/…`); staff see them through signed URLs.
 - Staff = `admin` or `maintenance` role (`is_staff()`); the first account to sign up becomes admin via the signup trigger.
 - The camera/field screens use the `.dark` token set as "field mode"; the admin dashboard uses the light paper theme.
