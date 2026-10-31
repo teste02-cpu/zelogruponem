@@ -160,6 +160,7 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, onOpenChange }:
               <dl className="grid grid-cols-2 gap-3 text-sm">
                 <Info label="Local" value={incident.location} />
                 <Info label="Solicitante" value={incident.reporter_name} />
+                <Info label="E-mail do solicitante" value={incident.reporter_email ?? "Não informado"} />
                 <Info label="Aberto em" value={format(new Date(incident.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })} />
                 <Info
                   label="Resolvido em"

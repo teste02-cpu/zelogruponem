@@ -2,20 +2,29 @@ import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { IncidentStatus } from "./incident-meta";
+import { normalizeOptionalEmail } from "./rate-limit";
 
 const MAX_IMAGE_CHARS = 8_000_000;
+const IMAGE_RE = /^data:image\/(jpeg|png|webp);base64,/;
+const ANONYMOUS_USER_ID = "00000000-0000-0000-0000-000000000000";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Step 1 — the photo was just taken: ask the vision model to pre-fill the form. */
+function checkImage(value: unknown): string {
+  if (typeof value !== "string" || !IMAGE_RE.test(value)) throw new Error("Imagem inválida.");
+  if (value.length > MAX_IMAGE_CHARS) throw new Error("Imagem muito grande.");
+  return value;
+}
+
+/** Step 1 — public (no login): ask the vision model to pre-fill the form. */
 export const analyzeIncidentPhoto = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input: { imageDataUrl: string }) => {
-    if (typeof input?.imageDataUrl !== "string" || !/^data:image\/(jpeg|png|webp);base64,/.test(input.imageDataUrl)) {
-      throw new Error("Imagem inválida.");
-    }
-    if (input.imageDataUrl.length > MAX_IMAGE_CHARS) throw new Error("Imagem muito grande.");
-    return input;
-  })
+  .inputValidator((input: { imageDataUrl: string }) => ({ imageDataUrl: checkImage(input?.imageDataUrl) }))
   .handler(async ({ data }) => {
+    const { enforceRateLimit } = await import("./rate-limit.server");
+    try {
+      await enforceRateLimit("analyze");
+    } catch (error) {
+      return { ok: false as const, error: error instanceof Error ? error.message : "Tente novamente mais tarde." };
+    }
     const { analyzePhoto } = await import("./ai/incident-ai.server");
     const { AiGatewayError } = await import("./ai/gateway.server");
     try {
@@ -27,7 +36,9 @@ export const analyzeIncidentPhoto = createServerFn({ method: "POST" })
   });
 
 type CreateIncidentInput = {
-  photoPath: string;
+  imageDataUrl: string;
+  reporterName?: string;
+  reporterEmail?: string;
   block: string;
   room: string;
   category: string;
@@ -35,32 +46,46 @@ type CreateIncidentInput = {
   description: string;
 };
 
-/** Step 2 — "Registrar Ocorrência": classify priority server-side and store the ticket. */
+/** Step 2 — public (no login) "Registrar Ocorrência": upload photo, AI suggests priority, store the ticket. */
 export const createIncident = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: CreateIncidentInput) => {
+    const email = normalizeOptionalEmail(input?.reporterEmail);
+    if (email === "invalid") throw new Error("E-mail inválido.");
     const clean = {
-      photoPath: String(input?.photoPath ?? "").trim(),
+      imageDataUrl: checkImage(input?.imageDataUrl),
+      reporterName: String(input?.reporterName ?? "").trim().slice(0, 80),
+      reporterEmail: email,
       block: String(input?.block ?? "").trim().slice(0, 60),
       room: String(input?.room ?? "").trim().slice(0, 80),
       category: String(input?.category ?? "Outros").trim().slice(0, 60),
       title: String(input?.title ?? "").trim().slice(0, 120),
       description: String(input?.description ?? "").trim().slice(0, 2000),
     };
-    if (!clean.photoPath) throw new Error("A foto é obrigatória.");
     if (!clean.block && !clean.room) throw new Error("Informe a localização.");
     if (clean.description.length < 5) throw new Error("Descreva o problema.");
     if (!clean.title) clean.title = clean.category;
     return clean;
   })
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    if (!data.photoPath.startsWith(`${userId}/`)) throw new Error("Foto inválida.");
+  .handler(async ({ data }) => {
+    const { enforceRateLimit } = await import("./rate-limit.server");
+    const ipHash = await enforceRateLimit("create");
 
-    const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle();
-    const reporterName = profile?.full_name || "Colaborador";
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Photo goes straight to the private bucket from the server (reporters have no account).
+    const [, mime = "image/jpeg", b64 = ""] = /^data:(image\/[a-z]+);base64,(.*)$/s.exec(data.imageDataUrl) ?? [];
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
+    const photoPath = `anon/${crypto.randomUUID()}.${ext}`;
+    const { error: upErr } = await supabaseAdmin.storage
+      .from("incident-photos")
+      .upload(photoPath, bytes, { contentType: mime, upsert: false });
+    if (upErr) {
+      console.error("[incidents] photo upload failed", upErr);
+      throw new Error("Falha ao enviar a foto.");
+    }
+
     const location = [data.block, data.room].filter(Boolean).join(" - ");
-
     const { prioritizeIncident } = await import("./ai/incident-ai.server");
     const verdict = await prioritizeIncident({
       category: data.category,
@@ -69,15 +94,15 @@ export const createIncident = createServerFn({ method: "POST" })
       location,
     });
 
-    // Inserts bypass RLS on purpose: users cannot write incidents directly, so the
-    // AI-computed priority can't be forged from the browser.
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Inserts bypass RLS on purpose: nobody writes incidents directly, so the
+    // AI suggestion can't be forged from the browser.
     const { data: row, error } = await supabaseAdmin
       .from("incidents")
       .insert({
-        user_id: userId,
-        reporter_name: reporterName,
-        photo_path: data.photoPath,
+        reporter_name: data.reporterName || "Anônimo",
+        reporter_email: data.reporterEmail,
+        reporter_ip_hash: ipHash,
+        photo_path: photoPath,
         location,
         block: data.block || null,
         category: data.category,
@@ -90,13 +115,39 @@ export const createIncident = createServerFn({ method: "POST" })
         ai_priority_reason: verdict.source === "ia" ? verdict.justification : `${verdict.justification} (IA indisponível)`,
         priority_confirmed: false,
       })
-      .select("id, priority")
+      .select("id, tracking_token")
       .single();
     if (error) {
       console.error("[incidents] insert failed", error);
       throw new Error("Não foi possível registrar a ocorrência.");
     }
-    return { id: row.id, priority: row.priority };
+    return { id: row.id, protocol: row.id.slice(0, 8).toUpperCase(), token: row.tracking_token };
+  });
+
+/** Public — status of the tickets saved on this device (looked up by their secret tracking tokens). */
+export const getTrackedIncidents = createServerFn({ method: "POST" })
+  .inputValidator((input: { tokens: string[] }) => ({
+    tokens: (Array.isArray(input?.tokens) ? input.tokens : []).filter((t) => typeof t === "string" && UUID_RE.test(t)).slice(0, 50),
+  }))
+  .handler(async ({ data }) => {
+    if (!data.tokens.length) return [];
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("incidents")
+      .select("id, tracking_token, title, location, status, created_at, resolved_at, resolution_note")
+      .in("tracking_token", data.tokens)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error("Não foi possível carregar seus chamados.");
+    return (rows ?? []).map((r) => ({
+      token: r.tracking_token,
+      protocol: r.id.slice(0, 8).toUpperCase(),
+      title: r.title,
+      location: r.location,
+      status: r.status,
+      createdAt: r.created_at,
+      resolvedAt: r.resolved_at,
+      resolutionNote: r.status === "concluido" ? r.resolution_note : null,
+    }));
   });
 
 type UpdateIncidentInput = {
@@ -165,10 +216,15 @@ export const updateIncident = createServerFn({ method: "POST" })
         data.status === "concluido"
           ? `Seu chamado "${current.title}" (${current.location}) foi resolvido.${data.resolutionNote ? ` Nota da equipe: ${data.resolutionNote}` : ""}`
           : `Seu chamado "${current.title}" (${current.location}) está em atendimento pela equipe de manutenção.`;
-      const { error: nErr } = await supabase
-        .from("notifications")
-        .insert({ user_id: current.user_id, incident_id: current.id, message });
-      notified = !nErr;
+      if (current.user_id === ANONYMOUS_USER_ID) {
+        // Login-free reporter: the new status shows up in "Meus chamados" on their device.
+        notified = true;
+      } else {
+        const { error: nErr } = await supabase
+          .from("notifications")
+          .insert({ user_id: current.user_id, incident_id: current.id, message });
+        notified = !nErr;
+      }
     }
     return { ok: true, notified };
   });

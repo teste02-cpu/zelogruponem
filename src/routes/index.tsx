@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Bell, CheckCircle2, LayoutDashboard, Loader2, QrCode, RotateCcw, Sparkles } from "lucide-react";
+import { Bell, CheckCircle2, Loader2, QrCode, RotateCcw, ShieldCheck, Sparkles } from "lucide-react";
 
 import { CameraView } from "@/components/capture/CameraView";
 import { QrScannerDialog } from "@/components/capture/QrScannerDialog";
@@ -12,17 +12,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { supabase } from "@/integrations/supabase/client";
-import { analyzeIncidentPhoto, createIncident } from "@/lib/incidents.functions";
+import { analyzeIncidentPhoto, createIncident, getTrackedIncidents } from "@/lib/incidents.functions";
 import { BLOCKS, CATEGORIES, parseLocationCode } from "@/lib/incident-meta";
-import { dataUrlToBlob } from "@/lib/image";
+import { addTrackedTicket, readReporter, readSeenResolved, readTrackedTickets, saveReporter } from "@/lib/tracked-tickets";
 
-export const Route = createFileRoute("/_authenticated/")({
+export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Registrar ocorrência · Zelo" },
-      { name: "description", content: "Abra a câmera, fotografe o problema e registre a ocorrência em segundos." },
+      { name: "description", content: "Abra a câmera, fotografe o problema e registre a ocorrência em segundos, sem precisar de login." },
       { property: "og:title", content: "Registrar ocorrência · Zelo" },
       { property: "og:description", content: "Fotografe o problema do campus e a IA preenche o chamado para você." },
     ],
@@ -33,14 +31,16 @@ export const Route = createFileRoute("/_authenticated/")({
 type Step = "camera" | "review" | "done";
 
 function CapturePage() {
-  const { data: me } = useCurrentUser();
   const analyze = useServerFn(analyzeIncidentPhoto);
   const create = useServerFn(createIncident);
+  const tracked = useServerFn(getTrackedIncidents);
 
   const [step, setStep] = useState<Step>("camera");
   const [photo, setPhoto] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [aiNote, setAiNote] = useState<string | null>(null);
+  const [reporterName, setReporterName] = useState("");
+  const [reporterEmail, setReporterEmail] = useState("");
   const [block, setBlock] = useState("");
   const [room, setRoom] = useState("");
   const [category, setCategory] = useState<string>("Outros");
@@ -49,12 +49,23 @@ function CapturePage() {
   const [qrOpen, setQrOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [protocol, setProtocol] = useState<string | null>(null);
+  const [sentWithEmail, setSentWithEmail] = useState(false);
 
+  useEffect(() => {
+    const saved = readReporter();
+    setReporterName(saved.name);
+    setReporterEmail(saved.email);
+  }, []);
+
+  // Badge: tickets from this device that were resolved since the reporter last looked.
   const { data: unread = 0 } = useQuery({
-    queryKey: ["notifications-unread"],
+    queryKey: ["tracked-unread"],
     queryFn: async () => {
-      const { count } = await supabase.from("notifications").select("id", { count: "exact", head: true }).eq("read", false);
-      return count ?? 0;
+      const tokens = readTrackedTickets().map((t) => t.token);
+      if (!tokens.length) return 0;
+      const rows = await tracked({ data: { tokens } });
+      const seen = new Set(readSeenResolved());
+      return rows.filter((r) => r.status === "concluido" && !seen.has(r.token)).length;
     },
   });
 
@@ -99,7 +110,7 @@ function CapturePage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!photo || !me) return;
+    if (!photo) return;
     if (!block && !room.trim()) {
       toast.error("Informe a localização.");
       return;
@@ -110,14 +121,13 @@ function CapturePage() {
     }
     setSubmitting(true);
     try {
-      const path = `${me.id}/${crypto.randomUUID()}.jpg`;
-      const blob = await dataUrlToBlob(photo);
-      const { error: upErr } = await supabase.storage
-        .from("incident-photos")
-        .upload(path, blob, { contentType: "image/jpeg", upsert: false });
-      if (upErr) throw new Error("Falha ao enviar a foto.");
-      const res = await create({ data: { photoPath: path, block, room, category, title, description } });
-      setProtocol(res.id.slice(0, 8).toUpperCase());
+      const res = await create({
+        data: { imageDataUrl: photo, reporterName, reporterEmail, block, room, category, title, description },
+      });
+      saveReporter({ name: reporterName.trim(), email: reporterEmail.trim() });
+      addTrackedTicket({ token: res.token, protocol: res.protocol, title: title || category, createdAt: new Date().toISOString() });
+      setProtocol(res.protocol);
+      setSentWithEmail(!!reporterEmail.trim());
       setStep("done");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível registrar.");
@@ -129,16 +139,15 @@ function CapturePage() {
   return (
     <div className="dark flex h-dvh flex-col bg-background text-foreground">
       <header className="flex items-center justify-between px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <div className="flex items-center gap-2">
-          <span className="font-display text-xl font-extrabold">zelo</span>
-          <span className="rounded-full bg-secondary px-2.5 py-1 text-xs text-muted-foreground">{me?.name ?? "…"}</span>
-        </div>
+        <span className="font-display text-xl font-extrabold">zelo</span>
         <nav className="flex items-center gap-1">
-          {me?.isStaff && (
-            <Link to="/admin" className="grid size-10 place-items-center rounded-full hover:bg-secondary" aria-label="Painel">
-              <LayoutDashboard className="size-5" />
-            </Link>
-          )}
+          <Link
+            to="/admin"
+            className="inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:bg-secondary"
+            aria-label="Área da equipe"
+          >
+            <ShieldCheck className="size-4" /> Equipe
+          </Link>
           <Link to="/meus-chamados" className="relative grid size-10 place-items-center rounded-full hover:bg-secondary" aria-label="Meus chamados">
             <Bell className="size-5" />
             {unread > 0 && (
@@ -181,9 +190,32 @@ function CapturePage() {
           <div className="space-y-4 px-4 pb-32 pt-5">
             {aiNote && <p className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground">{aiNote}</p>}
 
-            <div className="space-y-1.5">
-              <Label>Solicitante</Label>
-              <Input value={me?.name ?? ""} readOnly className="bg-muted text-muted-foreground" />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="reporter-name">
+                  Seu nome <span className="font-normal text-muted-foreground">(opcional)</span>
+                </Label>
+                <Input
+                  id="reporter-name"
+                  value={reporterName}
+                  onChange={(e) => setReporterName(e.target.value)}
+                  placeholder="Pode deixar em branco"
+                  autoComplete="name"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="reporter-email">
+                  E-mail <span className="font-normal text-muted-foreground">(opcional)</span>
+                </Label>
+                <Input
+                  id="reporter-email"
+                  type="email"
+                  value={reporterEmail}
+                  onChange={(e) => setReporterEmail(e.target.value)}
+                  placeholder="Para receber o aviso de resolução"
+                  autoComplete="email"
+                />
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -267,7 +299,8 @@ function CapturePage() {
           </span>
           <h1 className="text-3xl font-extrabold">Ocorrência registrada</h1>
           <p className="text-muted-foreground">
-            A equipe de manutenção já recebeu seu chamado. Você será avisado aqui quando for resolvido.
+            A equipe de manutenção já recebeu seu chamado. Acompanhe o andamento em "Meus chamados" neste aparelho
+            {sentWithEmail ? " — e avisaremos no seu e-mail quando for resolvido." : "."}
           </p>
           {protocol && <p className="font-mono text-sm text-muted-foreground">Protocolo #{protocol}</p>}
           <div className="mt-4 flex w-full max-w-xs flex-col gap-2">

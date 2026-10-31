@@ -32,11 +32,14 @@ export type Database = {
           priority_reason: string | null
           priority_set_at: string | null
           priority_set_by: string | null
+          reporter_email: string | null
+          reporter_ip_hash: string | null
           reporter_name: string
           resolution_note: string | null
           resolved_at: string | null
           status: Database["public"]["Enums"]["incident_status"]
           title: string
+          tracking_token: string
           updated_at: string
           user_id: string
         }
@@ -57,13 +60,16 @@ export type Database = {
           priority_reason?: string | null
           priority_set_at?: string | null
           priority_set_by?: string | null
+          reporter_email?: string | null
+          reporter_ip_hash?: string | null
           reporter_name: string
           resolution_note?: string | null
           resolved_at?: string | null
           status?: Database["public"]["Enums"]["incident_status"]
           title: string
+          tracking_token?: string
           updated_at?: string
-          user_id: string
+          user_id?: string
         }
         Update: {
           ai_priority?: Database["public"]["Enums"]["incident_priority"] | null
@@ -82,11 +88,14 @@ export type Database = {
           priority_reason?: string | null
           priority_set_at?: string | null
           priority_set_by?: string | null
+          reporter_email?: string | null
+          reporter_ip_hash?: string | null
           reporter_name?: string
           resolution_note?: string | null
           resolved_at?: string | null
           status?: Database["public"]["Enums"]["incident_status"]
           title?: string
+          tracking_token?: string
           updated_at?: string
           user_id?: string
         }
@@ -160,6 +169,27 @@ export type Database = {
           email?: string | null
           full_name?: string
           id?: string
+        }
+        Relationships: []
+      }
+      request_log: {
+        Row: {
+          created_at: string
+          id: number
+          ip_hash: string
+          kind: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          ip_hash: string
+          kind: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          ip_hash?: string
+          kind?: string
         }
         Relationships: []
       }
