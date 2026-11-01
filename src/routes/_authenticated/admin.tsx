@@ -146,7 +146,7 @@ function AdminDashboard() {
             {me?.isAdmin && (
               <>
                 <UsersDialog currentUserId={me.id} />
-                <TeamDialog />
+                <TeamDialog currentUserId={me.id} />
               </>
             )}
             <Button variant="outline" size="sm" asChild>
