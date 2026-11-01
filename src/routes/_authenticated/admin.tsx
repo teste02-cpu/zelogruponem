@@ -274,6 +274,7 @@ function AdminDashboard() {
         incident={selected}
         photoUrl={selected?.photo_path ? urls[selected.photo_path] : undefined}
         staff={staff}
+        isAdmin={me?.isAdmin ?? false}
         onOpenChange={(o) => !o && setOpenId(null)}
       />
     </div>

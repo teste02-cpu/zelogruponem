@@ -281,3 +281,51 @@ export const updateIncident = createServerFn({ method: "POST" })
     }
     return { ok: true, notified };
   });
+
+/** Admin only — delete an incident and remove its private photo from storage. */
+export const deleteIncident = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { id: string }) => {
+    if (typeof input?.id !== "string" || !UUID_RE.test(input.id)) {
+      throw new Error("Chamado inválido.");
+    }
+    return { id: input.id };
+  })
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin, error: roleError } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (roleError) throw new Error("Não foi possível verificar sua permissão.");
+    if (!isAdmin) throw new Error("Apenas administradores podem excluir chamados.");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: incident, error: readError } = await supabaseAdmin
+      .from("incidents")
+      .select("id, photo_path")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (readError) throw new Error("Não foi possível localizar o chamado.");
+    if (!incident) throw new Error("Chamado não encontrado.");
+
+    const { error: deleteError } = await supabaseAdmin
+      .from("incidents")
+      .delete()
+      .eq("id", data.id);
+    if (deleteError) {
+      console.error("[incidents] delete failed", deleteError);
+      throw new Error("Não foi possível excluir o chamado.");
+    }
+
+    if (!incident.photo_path) return { photoCleanupFailed: false };
+    const { error: storageError } = await supabaseAdmin.storage
+      .from("incident-photos")
+      .remove([incident.photo_path]);
+    if (storageError) {
+      console.error("[incidents] photo cleanup failed after incident deletion", {
+        incidentId: incident.id,
+        error: storageError,
+      });
+    }
+    return { photoCleanupFailed: !!storageError };
+  });

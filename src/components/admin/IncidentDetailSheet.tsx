@@ -4,16 +4,27 @@ import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, Trash2 } from "lucide-react";
 
 import { PriorityBadge } from "@/components/incident/Badges";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { updateIncident } from "@/lib/incidents.functions";
+import { deleteIncident, updateIncident } from "@/lib/incidents.functions";
 import { PRIORITY_LABEL, STATUS_LABEL, type IncidentStatus } from "@/lib/incident-meta";
 import type { Priority } from "@/lib/priority";
 import { cn } from "@/lib/utils";
@@ -23,6 +34,7 @@ type Props = {
   incident: IncidentRow | null;
   photoUrl?: string | undefined;
   staff: StaffMember[];
+  isAdmin: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
@@ -34,8 +46,9 @@ const priorityActiveClass: Record<Priority, string> = {
   baixa: "bg-priority-low text-primary-foreground shadow-sm",
 };
 
-export function IncidentDetailSheet({ incident, photoUrl, staff, onOpenChange }: Props) {
+export function IncidentDetailSheet({ incident, photoUrl, staff, isAdmin, onOpenChange }: Props) {
   const update = useServerFn(updateIncident);
+  const removeIncident = useServerFn(deleteIncident);
   const qc = useQueryClient();
   const [status, setStatus] = useState<IncidentStatus>("pendente");
   const [assignee, setAssignee] = useState<string>("none");
@@ -44,6 +57,7 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, onOpenChange }:
   const [saving, setSaving] = useState(false);
   const [priority, setPriority] = useState<Priority>("media");
   const [priorityNote, setPriorityNote] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!incident) return;
@@ -78,6 +92,30 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, onOpenChange }:
       toast.error(err instanceof Error ? err.message : "Erro ao salvar");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function remove() {
+    if (!incident) return;
+    setDeleting(true);
+    try {
+      const result = await removeIncident({ data: { id: incident.id } });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["admin-incidents"] }),
+        qc.invalidateQueries({ queryKey: ["account-incidents"] }),
+        qc.invalidateQueries({ queryKey: ["tracked-incidents"] }),
+        qc.invalidateQueries({ queryKey: ["tracked-unread"] }),
+      ]);
+      onOpenChange(false);
+      if (result.photoCleanupFailed) {
+        toast.warning("Chamado excluído, mas não foi possível remover a foto.");
+      } else {
+        toast.success("Chamado excluído.");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível excluir o chamado.");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -225,6 +263,43 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, onOpenChange }:
                 {saving && <Loader2 className="animate-spin" />}
                 {!incident.priority_confirmed ? "Confirmar prioridade e salvar" : statusChanged && notify ? "Salvar e notificar" : "Salvar"}
               </Button>
+              {isAdmin && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      className="w-full"
+                      disabled={saving || deleting}
+                    >
+                      <Trash2 /> Excluir chamado
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir este chamado?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta ação é permanente. O chamado será removido do painel e do histórico de quem
+                        o registrou.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        disabled={deleting}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          void remove();
+                        }}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {deleting && <Loader2 className="animate-spin" />}
+                        Excluir definitivamente
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
           </>
         )}
