@@ -16,3 +16,4 @@
 - Incident photos are uploaded by the server into the private `incident-photos` bucket under `anon/…` (older ones under `{userId}/…`); staff see them through signed URLs.
 - Staff = `admin` or `maintenance` role (`is_staff()`); Google and reporter signups start with only the `user` role. Administrators manage promotions in the admin-only Users area. The first non-Google, non-reporter account keeps the existing admin bootstrap behavior.
 - The camera/field screens use the `.dark` token set as "field mode"; the admin dashboard uses the light paper theme.
+- Keep the Lovable Cloud-managed `.env` tracked in git (not in `.gitignore`): the publish build reads the public `VITE_SUPABASE_*` values from it, and ignoring it breaks the live site with "Missing Supabase environment variable(s)". It holds only public values; secret keys never go there.
