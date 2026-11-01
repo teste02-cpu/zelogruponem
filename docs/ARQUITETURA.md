@@ -18,6 +18,10 @@
  └──────────────────────────┘                └──────────────────────────────┘
 ```
 
+Quem registra pode criar uma conta opcional em `/conta`: os próximos chamados ficam
+associados ao usuário autenticado e podem ser consultados em outros aparelhos. Sem conta,
+o registro continua público e o acompanhamento permanece disponível pelo token salvo no aparelho.
+
 ## Camadas
 - **Frontend**: TanStack Start + React 19 + Tailwind v4, mobile-first. Instalável (manifest PWA).
 - **Backend**: server functions (`src/lib/incidents.functions.ts`) — autenticação via token da sessão.
@@ -27,8 +31,11 @@
 
 ## Segurança
 - Usuários não inserem chamados diretamente: só o servidor grava, para que a prioridade da IA não seja forjada.
+- O token de sessão é validado no servidor antes de associar um chamado a uma conta; o histórico da conta é filtrado pelo usuário validado.
+- Contas de quem registra recebem apenas o papel `user`; não recebem acesso à equipe nem à administração.
+- Novos cadastros do Google recebem somente o papel `user`; administradores aprovam o acesso pelo botão "Usuários".
 - Fotos em bucket privado; cada usuário só envia para a própria pasta; equipe lê tudo via URL assinada.
-- O primeiro usuário cadastrado vira administrador; ele adiciona a equipe pelo botão "Equipe".
+- O primeiro cadastro por e-mail que não seja de reporter ainda inicia como administrador; cadastros Google aguardam aprovação. Administradores gerenciam permissões nos botões "Usuários" e "Equipe".
 
 ## SSO institucional
 Login com Google (pode ser restrito ao domínio da universidade) e e-mail/senha. SAML/OIDC institucional pode ser

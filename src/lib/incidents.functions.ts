@@ -39,6 +39,7 @@ type CreateIncidentInput = {
   imageDataUrl: string;
   reporterName?: string;
   reporterEmail?: string;
+  accessToken?: string;
   block: string;
   room: string;
   category: string;
@@ -46,15 +47,18 @@ type CreateIncidentInput = {
   description: string;
 };
 
-/** Step 2 — public (no login) "Registrar Ocorrência": upload photo, AI suggests priority, store the ticket. */
+/** Step 2 — public "Registrar Ocorrência": login is optional; the server stores and prioritizes the ticket. */
 export const createIncident = createServerFn({ method: "POST" })
   .inputValidator((input: CreateIncidentInput) => {
     const email = normalizeOptionalEmail(input?.reporterEmail);
     if (email === "invalid") throw new Error("E-mail inválido.");
+    const accessToken = typeof input?.accessToken === "string" ? input.accessToken.trim() : "";
+    if (accessToken.length > 4096) throw new Error("Sessão inválida.");
     const clean = {
       imageDataUrl: checkImage(input?.imageDataUrl),
       reporterName: String(input?.reporterName ?? "").trim().slice(0, 80),
       reporterEmail: email,
+      accessToken: accessToken || undefined,
       block: String(input?.block ?? "").trim().slice(0, 60),
       room: String(input?.room ?? "").trim().slice(0, 80),
       category: String(input?.category ?? "Outros").trim().slice(0, 60),
@@ -71,9 +75,17 @@ export const createIncident = createServerFn({ method: "POST" })
     const ipHash = await enforceRateLimit("create");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const reporter = data.accessToken
+      ? await supabaseAdmin.auth.getUser(data.accessToken).then(({ data: result, error }) => {
+          if (error || !result.user)
+            throw new Error("Sua sessão expirou. Entre novamente para registrar.");
+          return result.user;
+        })
+      : null;
 
-    // Photo goes straight to the private bucket from the server (reporters have no account).
-    const [, mime = "image/jpeg", b64 = ""] = /^data:(image\/[a-z]+);base64,(.*)$/s.exec(data.imageDataUrl) ?? [];
+    // Photos always go through the server into the private bucket.
+    const [, mime = "image/jpeg", b64 = ""] =
+      /^data:(image\/[a-z]+);base64,(.*)$/s.exec(data.imageDataUrl) ?? [];
     const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
     const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
     const photoPath = `anon/${crypto.randomUUID()}.${ext}`;
@@ -99,8 +111,13 @@ export const createIncident = createServerFn({ method: "POST" })
     const { data: row, error } = await supabaseAdmin
       .from("incidents")
       .insert({
-        reporter_name: data.reporterName || "Anônimo",
-        reporter_email: data.reporterEmail,
+        user_id: reporter?.id ?? ANONYMOUS_USER_ID,
+        reporter_name:
+          (typeof reporter?.user_metadata?.["full_name"] === "string" &&
+            reporter.user_metadata["full_name"].trim()) ||
+          data.reporterName ||
+          "Anônimo",
+        reporter_email: reporter?.email ?? data.reporterEmail,
         reporter_ip_hash: ipHash,
         photo_path: photoPath,
         location,
@@ -122,6 +139,42 @@ export const createIncident = createServerFn({ method: "POST" })
       throw new Error("Não foi possível registrar a ocorrência.");
     }
     return { id: row.id, protocol: row.id.slice(0, 8).toUpperCase(), token: row.tracking_token };
+  });
+
+/** Logged-in reporters can recover their saved tickets on any device. */
+export const getAccountIncidents = createServerFn({ method: "POST" })
+  .inputValidator((input: { accessToken: string }) => {
+    if (
+      typeof input?.accessToken !== "string" ||
+      !input.accessToken.trim() ||
+      input.accessToken.length > 4096
+    ) {
+      throw new Error("Sessão inválida.");
+    }
+    return { accessToken: input.accessToken.trim() };
+  })
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(data.accessToken);
+    if (authError || !authData.user) throw new Error("Sua sessão expirou. Entre novamente.");
+
+    const { data: rows, error } = await supabaseAdmin
+      .from("incidents")
+      .select("id, title, location, status, created_at, resolved_at, resolution_note")
+      .eq("user_id", authData.user.id)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw new Error("Não foi possível carregar seus chamados.");
+    return (rows ?? []).map((row) => ({
+      id: row.id,
+      protocol: row.id.slice(0, 8).toUpperCase(),
+      title: row.title,
+      location: row.location,
+      status: row.status,
+      createdAt: row.created_at,
+      resolvedAt: row.resolved_at,
+      resolutionNote: row.status === "concluido" ? row.resolution_note : null,
+    }));
   });
 
 /** Public — status of the tickets saved on this device (looked up by their secret tracking tokens). */

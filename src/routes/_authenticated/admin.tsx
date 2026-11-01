@@ -6,6 +6,7 @@ import { Camera, Columns3, List, LogOut, Search } from "lucide-react";
 import { IncidentCard } from "@/components/admin/IncidentCard";
 import { IncidentDetailSheet } from "@/components/admin/IncidentDetailSheet";
 import { TeamDialog } from "@/components/admin/TeamDialog";
+import { UsersDialog } from "@/components/admin/UsersDialog";
 import { LocationsDialog } from "@/components/admin/LocationsDialog";
 import { useLocations } from "@/hooks/use-locations";
 import type { IncidentRow, StaffMember } from "@/components/admin/types";
@@ -142,7 +143,12 @@ function AdminDashboard() {
           </div>
           <div className="flex items-center gap-2">
             <LocationsDialog />
-            {me?.isAdmin && <TeamDialog />}
+            {me?.isAdmin && (
+              <>
+                <UsersDialog currentUserId={me.id} />
+                <TeamDialog />
+              </>
+            )}
             <Button variant="outline" size="sm" asChild>
               <Link to="/">
                 <Camera /> <span className="hidden sm:inline">Registrar</span>

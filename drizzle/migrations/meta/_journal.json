@@ -29,6 +29,20 @@
       "when": 1793475185257,
       "tag": "0003_campus_locations",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793487937136,
+      "tag": "0004_reporter_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793567937136,
+      "tag": "0005_google_users_require_approval",
+      "breakpoints": true
     }
   ]
 }

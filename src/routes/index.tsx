@@ -3,7 +3,16 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Bell, CheckCircle2, Loader2, QrCode, RotateCcw, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  Bell,
+  CheckCircle2,
+  Loader2,
+  QrCode,
+  RotateCcw,
+  ShieldCheck,
+  Sparkles,
+  UserRound,
+} from "lucide-react";
 
 import { CameraView } from "@/components/capture/CameraView";
 import { QrScannerDialog } from "@/components/capture/QrScannerDialog";
@@ -16,6 +25,7 @@ import { analyzeIncidentPhoto, createIncident, getTrackedIncidents } from "@/lib
 import { CATEGORIES, parseLocationCode } from "@/lib/incident-meta";
 import { useLocations } from "@/hooks/use-locations";
 import { addTrackedTicket, readReporter, readSeenResolved, readTrackedTickets, saveReporter } from "@/lib/tracked-tickets";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -54,9 +64,30 @@ function CapturePage() {
   const [sentWithEmail, setSentWithEmail] = useState(false);
 
   useEffect(() => {
+    let active = true;
     const saved = readReporter();
     setReporterName(saved.name);
     setReporterEmail(saved.email);
+    supabase.auth
+      .getSession()
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          toast.error("Não foi possível carregar os dados da sua conta.");
+          return;
+        }
+        const user = data.session?.user;
+        if (!user) return;
+        const metadata = user.user_metadata as { full_name?: string; name?: string };
+        setReporterName(metadata.full_name || metadata.name || saved.name);
+        setReporterEmail(user.email ?? saved.email);
+      })
+      .catch(() => {
+        if (active) toast.error("Não foi possível carregar os dados da sua conta.");
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Badge: tickets from this device that were resolved since the reporter last looked.
@@ -123,8 +154,20 @@ function CapturePage() {
     }
     setSubmitting(true);
     try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
       const res = await create({
-        data: { imageDataUrl: photo, reporterName, reporterEmail, block, room, category, title, description },
+        data: {
+          imageDataUrl: photo,
+          reporterName,
+          reporterEmail,
+          ...(sessionData.session ? { accessToken: sessionData.session.access_token } : {}),
+          block,
+          room,
+          category,
+          title,
+          description,
+        },
       });
       saveReporter({ name: reporterName.trim(), email: reporterEmail.trim() });
       addTrackedTicket({ token: res.token, protocol: res.protocol, title: title || category, createdAt: new Date().toISOString() });
@@ -149,6 +192,13 @@ function CapturePage() {
             aria-label="Área da equipe"
           >
             <ShieldCheck className="size-4" /> Equipe
+          </Link>
+          <Link
+            to="/conta"
+            className="inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground hover:bg-secondary"
+            aria-label="Minha conta"
+          >
+            <UserRound className="size-4" /> Conta
           </Link>
           <Link to="/meus-chamados" className="relative grid size-10 place-items-center rounded-full hover:bg-secondary" aria-label="Meus chamados">
             <Bell className="size-5" />
@@ -219,6 +269,16 @@ function CapturePage() {
                 />
               </div>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Quer salvar seus dados e acompanhar chamados em outros aparelhos?{" "}
+              <Link
+                to="/conta"
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Crie sua conta
+              </Link>
+              . O login é opcional.
+            </p>
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
