@@ -4,6 +4,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+#lovable-badge {
+  display: none !important;
+}
+
 /*
  * Zelo — design system.
  * Warm "field notebook" paper + deep ink + signal orange.
