@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Camera, Loader2 } from "lucide-react";
-import "@lovable.dev/cloud-auth-js/styles.css";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -144,8 +143,8 @@ function AuthPage() {
     }
   }
 
-  async function oauth(provider: "google" | "lovable") {
-    const result = await lovable.auth.signInWithOAuth(provider, {
+  async function signInWithGoogle() {
+    const result = await lovable.auth.signInWithOAuth("google", {
       redirect_uri: window.location.origin + "/auth",
     });
     if (result.error) toast.error("Não foi possível entrar com essa conta.");
@@ -178,16 +177,9 @@ function AuthPage() {
         </div>
 
         <div className="mt-10 space-y-4">
-          <Button variant="secondary" size="lg" className="w-full" onClick={() => oauth("google")}>
+          <Button variant="secondary" size="lg" className="w-full" onClick={signInWithGoogle}>
             <GoogleMark /> Continuar com Google
           </Button>
-          <button
-            type="button"
-            className="lovable-auth-button w-full"
-            onClick={() => oauth("lovable")}
-          >
-            Continue with Lovable
-          </button>
 
           <div className="flex items-center gap-3 py-2 text-xs uppercase tracking-widest text-muted-foreground">
             <span className="h-px flex-1 bg-border" /> ou e-mail{" "}
