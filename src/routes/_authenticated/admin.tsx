@@ -12,25 +12,43 @@ import { useLocations } from "@/hooks/use-locations";
 import type { IncidentRow, StaffMember } from "@/components/admin/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useSignedUrls } from "@/hooks/use-signed-urls";
 import { supabase } from "@/integrations/supabase/client";
-import { PRIORITY_LABEL, PRIORITY_RANK, STATUS_LABEL, type IncidentStatus } from "@/lib/incident-meta";
+import {
+  PRIORITY_LABEL,
+  PRIORITY_RANK,
+  STATUS_LABEL,
+  type IncidentStatus,
+} from "@/lib/incident-meta";
 import type { Priority } from "@/lib/priority";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async ({ context }) => {
     const { data } = await supabase.rpc("is_staff", { _user_id: context.userId });
-    if (!data) throw redirect({ to: "/" });
+    if (!data) throw redirect({ to: "/conta" });
   },
   head: () => ({
     meta: [
       { title: "Painel de manutenção · Zelo" },
-      { name: "description", content: "Chamados do campus priorizados por IA: filtre, atribua responsáveis e notifique a resolução." },
+      {
+        name: "description",
+        content:
+          "Chamados do campus priorizados por IA: filtre, atribua responsáveis e notifique a resolução.",
+      },
       { property: "og:title", content: "Painel de manutenção · Zelo" },
-      { property: "og:description", content: "Gestão de chamados de infraestrutura universitária com priorização inteligente." },
+      {
+        property: "og:description",
+        content: "Gestão de chamados de infraestrutura universitária com priorização inteligente.",
+      },
     ],
   }),
   component: AdminDashboard,
@@ -52,7 +70,11 @@ function AdminDashboard() {
   const { data: incidents = [] } = useQuery({
     queryKey: ["admin-incidents"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("incidents").select("*").order("created_at", { ascending: false }).limit(500);
+      const { data, error } = await supabase
+        .from("incidents")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(500);
       if (error) throw error;
       return data as IncidentRow[];
     },
@@ -61,10 +83,16 @@ function AdminDashboard() {
   const { data: staff = [] } = useQuery({
     queryKey: ["staff"],
     queryFn: async (): Promise<StaffMember[]> => {
-      const { data: roles } = await supabase.from("user_roles").select("user_id, role").in("role", ["admin", "maintenance"]);
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("user_id, role")
+        .in("role", ["admin", "maintenance"]);
       const ids = Array.from(new Set((roles ?? []).map((r) => r.user_id)));
       if (!ids.length) return [];
-      const { data: profiles } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", ids);
       return (profiles ?? []).map((p) => ({
         id: p.id,
         name: p.full_name,
@@ -89,7 +117,13 @@ function AdminDashboard() {
 
   const { blocks: registeredBlocks } = useLocations();
   const blockOptions = useMemo(
-    () => Array.from(new Set([...registeredBlocks, ...incidents.map((i) => i.block).filter((b): b is string => !!b)])).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    () =>
+      Array.from(
+        new Set([
+          ...registeredBlocks,
+          ...incidents.map((i) => i.block).filter((b): b is string => !!b),
+        ]),
+      ).sort((a, b) => a.localeCompare(b, "pt-BR")),
     [registeredBlocks, incidents],
   );
 
@@ -99,15 +133,28 @@ function AdminDashboard() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return incidents
-      .filter((i) => priority === "all" || (priority === "triagem" ? !i.priority_confirmed : i.priority_confirmed && i.priority === priority))
+      .filter(
+        (i) =>
+          priority === "all" ||
+          (priority === "triagem"
+            ? !i.priority_confirmed
+            : i.priority_confirmed && i.priority === priority),
+      )
       .filter((i) => block === "all" || i.block === block)
       .filter((i) => status === "all" || i.status === status)
       .filter(
         (i) =>
           !q ||
-          [i.title, i.description, i.location, i.reporter_name, i.category].some((f) => f?.toLowerCase().includes(q)),
+          [i.title, i.description, i.location, i.reporter_name, i.category].some((f) =>
+            f?.toLowerCase().includes(q),
+          ),
       )
-      .sort((a, b) => Number(a.priority_confirmed) - Number(b.priority_confirmed) || PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || +new Date(b.created_at) - +new Date(a.created_at));
+      .sort(
+        (a, b) =>
+          Number(a.priority_confirmed) - Number(b.priority_confirmed) ||
+          PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] ||
+          +new Date(b.created_at) - +new Date(a.created_at),
+      );
   }, [incidents, priority, block, status, search]);
 
   const stats = useMemo(() => {
@@ -118,7 +165,9 @@ function AdminDashboard() {
       high: open.filter((i) => i.priority_confirmed && i.priority === "alta").length,
       triage: open.filter((i) => !i.priority_confirmed).length,
       progress: incidents.filter((i) => i.status === "em_andamento").length,
-      doneToday: incidents.filter((i) => i.resolved_at && new Date(i.resolved_at).toDateString() === today).length,
+      doneToday: incidents.filter(
+        (i) => i.resolved_at && new Date(i.resolved_at).toDateString() === today,
+      ).length,
     };
   }, [incidents]);
 
@@ -173,7 +222,12 @@ function AdminDashboard() {
         <section className="flex flex-col gap-2 rounded-2xl border bg-card p-3 shadow-card lg:flex-row lg:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input className="pl-9" placeholder="Buscar por título, local, solicitante…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input
+              className="pl-9"
+              placeholder="Buscar por título, local, solicitante…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
           <div className="grid grid-cols-3 gap-2 lg:flex">
             <Select value={priority} onValueChange={(v) => setPriority(v as typeof priority)}>
@@ -218,8 +272,18 @@ function AdminDashboard() {
             </Select>
           </div>
           <div className="flex rounded-lg bg-muted p-1">
-            <ViewButton active={view === "kanban"} onClick={() => setView("kanban")} icon={<Columns3 className="size-4" />} label="Kanban" />
-            <ViewButton active={view === "lista"} onClick={() => setView("lista")} icon={<List className="size-4" />} label="Lista" />
+            <ViewButton
+              active={view === "kanban"}
+              onClick={() => setView("kanban")}
+              icon={<Columns3 className="size-4" />}
+              label="Kanban"
+            />
+            <ViewButton
+              active={view === "lista"}
+              onClick={() => setView("lista")}
+              icon={<List className="size-4" />}
+              label="Lista"
+            />
           </div>
         </section>
 
@@ -231,7 +295,9 @@ function AdminDashboard() {
                 <div key={col} className="rounded-2xl bg-muted/70 p-3">
                   <div className="mb-3 flex items-center justify-between px-1">
                     <h2 className="font-display text-lg font-bold">{STATUS_LABEL[col]}</h2>
-                    <span className="rounded-full bg-card px-2 py-0.5 font-mono text-xs">{items.length}</span>
+                    <span className="rounded-full bg-card px-2 py-0.5 font-mono text-xs">
+                      {items.length}
+                    </span>
                   </div>
                   <div className="space-y-2">
                     {items.map((i) => (
@@ -243,7 +309,11 @@ function AdminDashboard() {
                         onOpen={() => setOpenId(i.id)}
                       />
                     ))}
-                    {items.length === 0 && <p className="px-1 py-6 text-center text-sm text-muted-foreground">Nenhum chamado</p>}
+                    {items.length === 0 && (
+                      <p className="px-1 py-6 text-center text-sm text-muted-foreground">
+                        Nenhum chamado
+                      </p>
+                    )}
                   </div>
                 </div>
               );
@@ -281,7 +351,15 @@ function AdminDashboard() {
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: number; tone?: "high" | "medium" | "low" }) {
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone?: "high" | "medium" | "low";
+}) {
   return (
     <div className="rounded-2xl border bg-card p-4 shadow-card">
       <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
@@ -299,7 +377,17 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: "hi
   );
 }
 
-function ViewButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+function ViewButton({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
   return (
     <button
       type="button"

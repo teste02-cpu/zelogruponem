@@ -9,10 +9,7 @@ import { toast } from "sonner";
 
 import { StatusBadge } from "@/components/incident/Badges";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { getAccountIncidents } from "@/lib/incidents.functions";
 
 export const Route = createFileRoute("/conta")({
@@ -38,11 +35,6 @@ function AccountPage() {
   const loadIncidents = useServerFn(getAccountIncidents);
   const [user, setUser] = useState<AccountUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -97,49 +89,9 @@ function AccountPage() {
     },
   });
 
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    try {
-      if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/conta`,
-            data: { full_name: name.trim(), account_type: "reporter" },
-          },
-        });
-        if (error) throw error;
-        if (!data.session) {
-          toast.success("Conta criada! Confirme pelo link enviado ao seu e-mail.");
-          setMode("signin");
-        }
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível acessar sua conta.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function signOut() {
     const { error } = await supabase.auth.signOut();
     if (error) toast.error("Não foi possível sair da conta.");
-  }
-
-  async function signInWithGoogle() {
-    try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}/conta`,
-      });
-      if (result.error) throw result.error;
-    } catch {
-      toast.error("Não foi possível continuar com o Google.");
-    }
   }
 
   return (
@@ -231,114 +183,26 @@ function AccountPage() {
             </section>
           </>
         ) : (
-          <section className="space-y-5">
+          <section className="space-y-5 rounded-2xl border bg-card p-6 text-center">
             <div>
-              <div className="flex items-center gap-2 text-primary">
+              <div className="flex justify-center text-primary">
                 <UserRound className="size-5" />
-                <span className="font-semibold">Conta de quem registra</span>
               </div>
-              <h2 className="mt-3 text-3xl font-extrabold">
-                {mode === "signin" ? "Acesse seus chamados" : "Salve seus dados"}
-              </h2>
+              <h2 className="mt-3 text-2xl font-extrabold">Acesse sua conta pelo menu Equipe</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                {mode === "signin"
-                  ? "Entre com seu e-mail para recuperar seus dados e chamados."
-                  : "Crie uma conta opcional para salvar seu nome e acompanhar seus chamados em qualquer aparelho."}{" "}
-                O registro de ocorrências continua disponível sem login.
+                Use o mesmo login para todos. Sua conta define se você verá seus chamados ou o
+                painel da equipe.
               </p>
             </div>
-
-            <Button
-              type="button"
-              variant="secondary"
-              size="lg"
-              className="w-full"
-              onClick={signInWithGoogle}
-            >
-              <GoogleMark /> Continuar com Google
+            <Button asChild size="lg">
+              <Link to="/auth">Entrar ou criar conta</Link>
             </Button>
-            <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-muted-foreground">
-              <span className="h-px flex-1 bg-border" /> ou e-mail{" "}
-              <span className="h-px flex-1 bg-border" />
-            </div>
-
-            <form onSubmit={submit} className="space-y-4">
-              {mode === "signup" && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="account-name">Seu nome</Label>
-                  <Input
-                    id="account-name"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    required
-                    autoComplete="name"
-                  />
-                </div>
-              )}
-              <div className="space-y-1.5">
-                <Label htmlFor="account-email">E-mail</Label>
-                <Input
-                  id="account-email"
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  required
-                  autoComplete="email"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="account-password">Senha</Label>
-                <Input
-                  id="account-password"
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  minLength={6}
-                  required
-                  autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                />
-              </div>
-              <Button type="submit" className="w-full" size="lg" disabled={busy}>
-                {busy && <Loader2 className="animate-spin" />}
-                {mode === "signin" ? "Entrar" : "Criar conta"}
-              </Button>
-            </form>
-            <button
-              type="button"
-              className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
-              onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-            >
-              {mode === "signin" ? "Ainda não tem conta? Criar conta" : "Já tenho uma conta"}
-            </button>
+            <Button asChild variant="secondary">
+              <Link to="/">Registrar ocorrência sem login</Link>
+            </Button>
           </section>
         )}
       </main>
     </div>
-  );
-}
-
-function GoogleMark() {
-  return (
-    <svg viewBox="0 0 24 24" className="size-4" aria-hidden>
-      <path
-        fill="currentColor"
-        d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3Z"
-      />
-      <path
-        fill="currentColor"
-        opacity=".8"
-        d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22Z"
-      />
-      <path
-        fill="currentColor"
-        opacity=".6"
-        d="M6.4 14c-.2-.6-.3-1.3-.3-2s.1-1.4.3-2V7.4H3.1a10 10 0 0 0 0 9.2L6.4 14Z"
-      />
-      <path
-        fill="currentColor"
-        opacity=".9"
-        d="M12 6c1.5 0 2.8.5 3.8 1.5l2.9-2.9A10 10 0 0 0 3.1 7.4L6.4 10C7.2 7.7 9.4 6 12 6Z"
-      />
-    </svg>
   );
 }
