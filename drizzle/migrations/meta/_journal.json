@@ -43,6 +43,13 @@
       "when": 1793567937136,
       "tag": "0005_google_users_require_approval",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793705027926,
+      "tag": "0006_dashboard_admin_only",
+      "breakpoints": true
     }
   ]
 }

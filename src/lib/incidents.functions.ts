@@ -229,7 +229,7 @@ export const updateIncident = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: isStaff } = await supabase.rpc("is_staff", { _user_id: userId });
-    if (!isStaff) throw new Error("Apenas a equipe de manutenção pode alterar chamados.");
+    if (!isStaff) throw new Error("Apenas administradores podem alterar chamados.");
 
     const { data: current, error: readErr } = await supabase
       .from("incidents")

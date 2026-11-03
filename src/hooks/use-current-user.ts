@@ -29,7 +29,7 @@ export const currentUserQuery = {
       email: user.email ?? profile?.email ?? null,
       name: profile?.full_name || meta?.full_name || meta?.name || user.email?.split("@")[0] || "Colaborador",
       roles: roleList,
-      isStaff: roleList.includes("admin") || roleList.includes("maintenance"),
+      isStaff: roleList.includes("admin"),
       isAdmin: roleList.includes("admin"),
     };
   },
