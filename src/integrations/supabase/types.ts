@@ -14,6 +14,35 @@ export type Database = {
   }
   public: {
     Tables: {
+      incident_edits: {
+        Row: {
+          changes: Json
+          created_at: string
+          id: string
+          incident_id: string
+        }
+        Insert: {
+          changes: Json
+          created_at?: string
+          id?: string
+          incident_id: string
+        }
+        Update: {
+          changes?: Json
+          created_at?: string
+          id?: string
+          incident_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_edits_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incidents: {
         Row: {
           ai_priority: Database["public"]["Enums"]["incident_priority"] | null
@@ -32,6 +61,8 @@ export type Database = {
           priority_reason: string | null
           priority_set_at: string | null
           priority_set_by: string | null
+          reporter_edit_seen: boolean
+          reporter_edited_at: string | null
           reporter_email: string | null
           reporter_ip_hash: string | null
           reporter_name: string
@@ -60,6 +91,8 @@ export type Database = {
           priority_reason?: string | null
           priority_set_at?: string | null
           priority_set_by?: string | null
+          reporter_edit_seen?: boolean
+          reporter_edited_at?: string | null
           reporter_email?: string | null
           reporter_ip_hash?: string | null
           reporter_name: string
@@ -88,6 +121,8 @@ export type Database = {
           priority_reason?: string | null
           priority_set_at?: string | null
           priority_set_by?: string | null
+          reporter_edit_seen?: boolean
+          reporter_edited_at?: string | null
           reporter_email?: string | null
           reporter_ip_hash?: string | null
           reporter_name?: string
