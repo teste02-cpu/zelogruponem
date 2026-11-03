@@ -1,6 +1,6 @@
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { MapPin, User, Wrench } from "lucide-react";
+import { MapPin, Pencil, User, Wrench } from "lucide-react";
 
 import { PriorityBadge, StatusBadge, priorityBarClass } from "@/components/incident/Badges";
 import { cn } from "@/lib/utils";
@@ -50,6 +50,11 @@ export function IncidentCard({ incident, photoUrl, assigneeName, onOpen, showSta
           )}
           <span className="font-mono">{formatDistanceToNow(new Date(incident.created_at), { locale: ptBR, addSuffix: true })}</span>
         </div>
+        {!incident.reporter_edit_seen && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
+            <Pencil className="size-3" /> Editado pelo colaborador
+          </span>
+        )}
         {showStatus && <StatusBadge status={incident.status} />}
       </div>
     </button>
