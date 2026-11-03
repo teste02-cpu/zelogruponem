@@ -28,6 +28,7 @@ import { deleteIncident, updateIncident } from "@/lib/incidents.functions";
 import { PRIORITY_LABEL, STATUS_LABEL, type IncidentStatus } from "@/lib/incident-meta";
 import type { Priority } from "@/lib/priority";
 import { cn } from "@/lib/utils";
+import { ReporterEditsSection } from "./ReporterEditsSection";
 import type { IncidentRow, StaffMember } from "./types";
 
 type Props = {
@@ -194,6 +195,8 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, isAdmin, onOpen
                   )}
                 </div>
               </section>
+
+              <ReporterEditsSection incident={incident} />
 
               <dl className="grid grid-cols-2 gap-3 text-sm">
                 <Info label="Local" value={incident.location} />
