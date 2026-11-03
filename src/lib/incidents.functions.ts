@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { IncidentStatus } from "./incident-meta";
 import { normalizeOptionalEmail } from "./rate-limit";
+import { canReporterEdit, cleanReporterEdit, diffReporterEdit, type ReporterEditFields } from "./reporter-edit";
 
 const MAX_IMAGE_CHARS = 8_000_000;
 const IMAGE_RE = /^data:image\/(jpeg|png|webp);base64,/;
@@ -160,7 +161,7 @@ export const getAccountIncidents = createServerFn({ method: "POST" })
 
     const { data: rows, error } = await supabaseAdmin
       .from("incidents")
-      .select("id, title, location, status, created_at, resolved_at, resolution_note")
+      .select("id, title, description, location, status, created_at, resolved_at, resolution_note, reporter_edited_at")
       .eq("user_id", authData.user.id)
       .order("created_at", { ascending: false })
       .limit(100);
@@ -169,7 +170,9 @@ export const getAccountIncidents = createServerFn({ method: "POST" })
       id: row.id,
       protocol: row.id.slice(0, 8).toUpperCase(),
       title: row.title,
+      description: row.description,
       location: row.location,
+      editedAt: row.reporter_edited_at,
       status: row.status,
       createdAt: row.created_at,
       resolvedAt: row.resolved_at,
@@ -187,7 +190,7 @@ export const getTrackedIncidents = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows, error } = await supabaseAdmin
       .from("incidents")
-      .select("id, tracking_token, title, location, status, created_at, resolved_at, resolution_note")
+      .select("id, tracking_token, title, description, location, status, created_at, resolved_at, resolution_note, reporter_edited_at")
       .in("tracking_token", data.tokens)
       .order("created_at", { ascending: false });
     if (error) throw new Error("Não foi possível carregar seus chamados.");
@@ -195,12 +198,68 @@ export const getTrackedIncidents = createServerFn({ method: "POST" })
       token: r.tracking_token,
       protocol: r.id.slice(0, 8).toUpperCase(),
       title: r.title,
+      description: r.description,
       location: r.location,
+      editedAt: r.reporter_edited_at,
       status: r.status,
       createdAt: r.created_at,
       resolvedAt: r.resolved_at,
       resolutionNote: r.status === "concluido" ? r.resolution_note : null,
     }));
+  });
+
+type ReporterEditInput = Partial<ReporterEditFields> & {
+  /** Logged-in reporter: ticket id + session token. */
+  id?: string;
+  accessToken?: string;
+  /** Login-free reporter: the secret tracking token saved on the device. */
+  trackingToken?: string;
+};
+
+/** Public — the reporter edits their own ticket while it is not concluded; admins are flagged. */
+export const editReporterIncident = createServerFn({ method: "POST" })
+  .inputValidator((input: ReporterEditInput) => {
+    const fields = cleanReporterEdit(input ?? {});
+    const trackingToken = typeof input?.trackingToken === "string" && UUID_RE.test(input.trackingToken) ? input.trackingToken : undefined;
+    const id = typeof input?.id === "string" && UUID_RE.test(input.id) ? input.id : undefined;
+    const accessToken = typeof input?.accessToken === "string" && input.accessToken.length <= 4096 ? input.accessToken.trim() : "";
+    if (!trackingToken && !(id && accessToken)) throw new Error("Chamado inválido.");
+    return { ...fields, trackingToken, id, accessToken };
+  })
+  .handler(async ({ data }) => {
+    const { enforceRateLimit } = await import("./rate-limit.server");
+    await enforceRateLimit("edit");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let query = supabaseAdmin.from("incidents").select("id, title, description, location, status, user_id");
+    if (data.trackingToken) {
+      query = query.eq("tracking_token", data.trackingToken);
+    } else {
+      const { data: authData, error } = await supabaseAdmin.auth.getUser(data.accessToken);
+      if (error || !authData.user) throw new Error("Sua sessão expirou. Entre novamente.");
+      query = query.eq("id", data.id!).eq("user_id", authData.user.id);
+    }
+    const { data: current, error: readErr } = await query.maybeSingle();
+    if (readErr || !current) throw new Error("Chamado não encontrado.");
+    if (!canReporterEdit(current.status)) throw new Error("Chamados concluídos não podem ser editados.");
+
+    const changes = diffReporterEdit(current, data);
+    if (!changes.length) return { ok: true, changed: false };
+
+    const { error: upErr } = await supabaseAdmin
+      .from("incidents")
+      .update({
+        title: data.title,
+        description: data.description,
+        location: data.location,
+        reporter_edited_at: new Date().toISOString(),
+        reporter_edit_seen: false,
+      })
+      .eq("id", current.id)
+      .neq("status", "concluido");
+    if (upErr) throw new Error("Não foi possível salvar a edição.");
+    await supabaseAdmin.from("incident_edits").insert({ incident_id: current.id, changes });
+    return { ok: true, changed: true };
   });
 
 type UpdateIncidentInput = {

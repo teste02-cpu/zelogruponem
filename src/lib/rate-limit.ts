@@ -2,6 +2,7 @@
 export const RATE_LIMITS = {
   analyze: 20,
   create: 8,
+  edit: 30,
 } as const;
 
 export type RateLimitKind = keyof typeof RATE_LIMITS;

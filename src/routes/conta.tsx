@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -10,7 +10,9 @@ import { toast } from "sonner";
 import { StatusBadge } from "@/components/incident/Badges";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { getAccountIncidents } from "@/lib/incidents.functions";
+import { EditIncidentDialog } from "@/components/incident/EditIncidentDialog";
+import { editReporterIncident, getAccountIncidents } from "@/lib/incidents.functions";
+import { canReporterEdit } from "@/lib/reporter-edit";
 
 export const Route = createFileRoute("/conta")({
   head: () => ({
@@ -33,6 +35,8 @@ type AccountUser = {
 
 function AccountPage() {
   const loadIncidents = useServerFn(getAccountIncidents);
+  const editIncident = useServerFn(editReporterIncident);
+  const qc = useQueryClient();
   const [user, setUser] = useState<AccountUser | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -171,11 +175,38 @@ function AccountPage() {
                         Nota da equipe: {incident.resolutionNote}
                       </p>
                     )}
-                    <div className="mt-3 flex justify-between font-mono text-[11px] text-muted-foreground">
+                    {incident.editedAt && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Editado por você em{" "}
+                        {format(new Date(incident.editedAt), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                      </p>
+                    )}
+                    <div className="mt-3 flex items-center justify-between gap-2 font-mono text-[11px] text-muted-foreground">
                       <span>#{incident.protocol}</span>
-                      <span>
-                        {format(new Date(incident.createdAt), "dd/MM/yy", { locale: ptBR })}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span>
+                          {format(new Date(incident.createdAt), "dd/MM/yy", { locale: ptBR })}
+                        </span>
+                        {canReporterEdit(incident.status) && (
+                          <EditIncidentDialog
+                            initial={{
+                              title: incident.title,
+                              description: incident.description,
+                              location: incident.location,
+                            }}
+                            onSave={async (fields) => {
+                              const { data, error } = await supabase.auth.getSession();
+                              if (error || !data.session)
+                                throw new Error("Sua sessão expirou. Entre novamente.");
+                              const res = await editIncident({
+                                data: { ...fields, id: incident.id, accessToken: data.session.access_token },
+                              });
+                              await qc.invalidateQueries({ queryKey: ["account-incidents"] });
+                              return res;
+                            }}
+                          />
+                        )}
+                      </div>
                     </div>
                   </article>
                 ))}

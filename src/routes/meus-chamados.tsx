@@ -7,7 +7,9 @@ import { ptBR } from "date-fns/locale";
 import { ArrowLeft, Camera, CheckCircle2 } from "lucide-react";
 
 import { StatusBadge } from "@/components/incident/Badges";
-import { getTrackedIncidents } from "@/lib/incidents.functions";
+import { EditIncidentDialog } from "@/components/incident/EditIncidentDialog";
+import { editReporterIncident, getTrackedIncidents } from "@/lib/incidents.functions";
+import { canReporterEdit } from "@/lib/reporter-edit";
 import { markResolvedSeen, readSeenResolved, readTrackedTickets } from "@/lib/tracked-tickets";
 
 export const Route = createFileRoute("/meus-chamados")({
@@ -24,6 +26,7 @@ export const Route = createFileRoute("/meus-chamados")({
 
 function MyIncidents() {
   const tracked = useServerFn(getTrackedIncidents);
+  const editIncident = useServerFn(editReporterIncident);
   const qc = useQueryClient();
 
   const { data, isPending } = useQuery({
@@ -88,9 +91,26 @@ function MyIncidents() {
                   </span>
                 </p>
               )}
-              <div className="mt-3 flex justify-between font-mono text-[11px] text-muted-foreground">
+              {i.editedAt && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Editado por você em {format(new Date(i.editedAt), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                </p>
+              )}
+              <div className="mt-3 flex items-center justify-between gap-2 font-mono text-[11px] text-muted-foreground">
                 <span>#{i.protocol}</span>
-                <span>{format(new Date(i.createdAt), "dd/MM/yy", { locale: ptBR })}</span>
+                <div className="flex items-center gap-2">
+                  <span>{format(new Date(i.createdAt), "dd/MM/yy", { locale: ptBR })}</span>
+                  {canReporterEdit(i.status) && (
+                    <EditIncidentDialog
+                      initial={{ title: i.title, description: i.description, location: i.location }}
+                      onSave={async (fields) => {
+                        const res = await editIncident({ data: { ...fields, trackingToken: i.token } });
+                        await qc.invalidateQueries({ queryKey: ["tracked-incidents"] });
+                        return res;
+                      }}
+                    />
+                  )}
+                </div>
               </div>
             </article>
           );
