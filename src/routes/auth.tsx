@@ -34,8 +34,8 @@ function safePath(value: unknown): string {
 }
 
 function defaultPathForRoles(roles: string[], requestedPath: string): string {
-  const isStaff = roles.includes("admin") || roles.includes("maintenance");
-  if (isStaff) return requestedPath;
+  // Only administrators enter the dashboard; everyone else goes to their own tickets.
+  if (roles.includes("admin")) return requestedPath;
   const requestedRoute = requestedPath.split("?")[0];
   return requestedRoute === "/conta" || requestedRoute === "/meus-chamados"
     ? requestedPath
