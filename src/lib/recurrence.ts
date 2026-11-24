@@ -1,0 +1,36 @@
+/** Recurring-problem detection: same reporter + same category within a time window. */
+export const RECURRENCE_WINDOW_DAYS = 90;
+export const RECURRENCE_MIN_COUNT = 3; // "mais de 2 vezes"
+const ANON = "00000000-0000-0000-0000-000000000000";
+
+export type RecurrenceInput = {
+  id: string;
+  user_id: string;
+  reporter_email: string | null;
+  reporter_name: string;
+  category: string;
+  created_at: string;
+};
+
+export type RecurrenceAlert = { key: string; reporter: string; category: string; ids: string[] };
+
+function reporterKey(i: RecurrenceInput): string | null {
+  if (i.user_id && i.user_id !== ANON) return `u:${i.user_id}`;
+  const email = i.reporter_email?.trim().toLowerCase();
+  return email ? `e:${email}` : null;
+}
+
+export function findRecurrences(rows: RecurrenceInput[], now = new Date()): RecurrenceAlert[] {
+  const since = now.getTime() - RECURRENCE_WINDOW_DAYS * 86_400_000;
+  const groups = new Map<string, RecurrenceAlert>();
+  for (const r of rows) {
+    if (new Date(r.created_at).getTime() < since) continue;
+    const who = reporterKey(r);
+    if (!who) continue;
+    const key = `${who}|${r.category.trim().toLowerCase()}`;
+    const g = groups.get(key) ?? { key, reporter: r.reporter_name, category: r.category, ids: [] };
+    g.ids.push(r.id);
+    groups.set(key, g);
+  }
+  return [...groups.values()].filter((g) => g.ids.length >= RECURRENCE_MIN_COUNT);
+}

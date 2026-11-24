@@ -57,6 +57,13 @@
       "when": 1793705429800,
       "tag": "0007_reporter_incident_edits",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795548257830,
+      "tag": "0008_harden_function_grants",
+      "breakpoints": true
     }
   ]
 }

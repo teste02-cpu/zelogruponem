@@ -1,7 +1,8 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Camera, Columns3, List, LogOut, Search } from "lucide-react";
+import { AlertTriangle, Camera, Columns3, List, LogOut, Search } from "lucide-react";
+import { findRecurrences, RECURRENCE_WINDOW_DAYS } from "@/lib/recurrence";
 
 import { IncidentCard } from "@/components/admin/IncidentCard";
 import { IncidentDetailSheet } from "@/components/admin/IncidentDetailSheet";
@@ -171,6 +172,8 @@ function AdminDashboard() {
     };
   }, [incidents]);
 
+  const recurrences = useMemo(() => findRecurrences(incidents), [incidents]);
+
   const selected = incidents.find((i) => i.id === openId) ?? null;
 
   async function signOut() {
@@ -218,6 +221,27 @@ function AdminDashboard() {
           <Stat label="Em andamento" value={stats.progress} />
           <Stat label="Concluídos hoje" value={stats.doneToday} tone="low" />
         </section>
+
+        {recurrences.length > 0 && (
+          <section className="space-y-2 rounded-2xl border border-priority-high/40 bg-priority-high/10 p-4">
+            <p className="flex items-center gap-2 font-display text-lg font-bold text-priority-high">
+              <AlertTriangle className="size-5" /> Problemas recorrentes
+            </p>
+            <ul className="space-y-1 text-sm">
+              {recurrences.map((r) => (
+                <li key={r.key} className="flex flex-wrap items-center gap-x-2">
+                  <span>
+                    <strong>{r.reporter}</strong> relatou <strong>{r.category}</strong> {r.ids.length} vezes nos
+                    últimos {RECURRENCE_WINDOW_DAYS} dias.
+                  </span>
+                  <button type="button" className="font-medium text-primary underline" onClick={() => setOpenId(r.ids[0] ?? null)}>
+                    Ver último
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <section className="flex flex-col gap-2 rounded-2xl border bg-card p-3 shadow-card lg:flex-row lg:items-center">
           <div className="relative flex-1">

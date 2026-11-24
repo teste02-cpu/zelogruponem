@@ -1,0 +1,2 @@
+- [x] Revisão de segurança máxima
+- [x] Alerta no painel para problema recorrente do mesmo usuário (>2 vezes em 3 meses)
