@@ -22,3 +22,15 @@ describe("recurrence", () => {
     expect(findRecurrences([row("a", 1, anon), row("b", 2, anon), row("c", 3, anon)], now)).toHaveLength(0);
   });
 });
+
+describe("recurrence across signed-in and anonymous reports", () => {
+  it("counts same e-mail with and without login together", () => {
+    const now = new Date("2026-11-24T00:00:00Z");
+    const a = findRecurrences([
+      { id: "1", user_id: "u1", reporter_email: "m@x.com", reporter_name: "M", category: "Pintura", created_at: "2026-11-03T00:00:00Z" },
+      { id: "2", user_id: "00000000-0000-0000-0000-000000000000", reporter_email: "M@x.com", reporter_name: "M", category: "Pintura", created_at: "2026-11-20T00:00:00Z" },
+    ], now);
+    expect(a.length).toBe(1);
+  });
+});
+
