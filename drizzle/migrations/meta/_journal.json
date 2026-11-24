@@ -64,6 +64,13 @@
       "when": 1795548257830,
       "tag": "0008_harden_function_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795548617533,
+      "tag": "0009_harden_role_checks_to_self",
+      "breakpoints": true
     }
   ]
 }
