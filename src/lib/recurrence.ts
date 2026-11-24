@@ -1,6 +1,6 @@
 /** Recurring-problem detection: same reporter + same category within a time window. */
 export const RECURRENCE_WINDOW_DAYS = 90;
-export const RECURRENCE_MIN_COUNT = 3; // "mais de 2 vezes"
+export const RECURRENCE_MIN_COUNT = 2; // "2 ou mais chamados iguais"
 const ANON = "00000000-0000-0000-0000-000000000000";
 
 export type RecurrenceInput = {

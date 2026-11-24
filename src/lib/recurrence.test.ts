@@ -8,14 +8,14 @@ const row = (id: string, daysAgo: number, extra: Partial<Parameters<typeof findR
 });
 
 describe("recurrence", () => {
-  it("alerts when the same user reports the same category 3 times in 90 days", () => {
-    expect(findRecurrences([row("a", 1), row("b", 30), row("c", 80)], now)).toHaveLength(1);
+  it("alerts when the same user reports the same category 2 times in 90 days", () => {
+    expect(findRecurrences([row("a", 1), row("b", 30)], now)).toHaveLength(1);
   });
-  it("does not alert for only 2 reports", () => {
-    expect(findRecurrences([row("a", 1), row("b", 30)], now)).toHaveLength(0);
+  it("does not alert for only 1 report", () => {
+    expect(findRecurrences([row("a", 1)], now)).toHaveLength(0);
   });
   it("ignores reports older than 90 days", () => {
-    expect(findRecurrences([row("a", 1), row("b", 30), row("c", 120)], now)).toHaveLength(0);
+    expect(findRecurrences([row("a", 1), row("b", 120)], now)).toHaveLength(0);
   });
   it("ignores anonymous reports without e-mail", () => {
     const anon = { user_id: "00000000-0000-0000-0000-000000000000" };
