@@ -230,3 +230,12 @@
     box-shadow: 0 0 0 18px oklch(0.7 0.19 45 / 0);
   }
 }
+
+@media print {
+  @page { size: A4 landscape; margin: 12mm; }
+  body { background: var(--background); }
+  .maintenance-report { min-height: auto; }
+  .maintenance-report thead { display: table-header-group; }
+  .maintenance-report tr { break-inside: avoid; }
+  .maintenance-report h1, .maintenance-report h2 { break-after: avoid; }
+}

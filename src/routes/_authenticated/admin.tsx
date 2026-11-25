@@ -1,8 +1,9 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Camera, Columns3, List, LogOut, Search } from "lucide-react";
+import { AlertTriangle, Camera, Columns3, List, LogOut, Search, FileBarChart } from "lucide-react";
 import { findRecurrences, RECURRENCE_WINDOW_DAYS } from "@/lib/recurrence";
+import { adminIncidentsOptions } from "@/lib/admin-incidents";
 
 import { IncidentCard } from "@/components/admin/IncidentCard";
 import { IncidentDetailSheet } from "@/components/admin/IncidentDetailSheet";
@@ -10,7 +11,7 @@ import { TeamDialog } from "@/components/admin/TeamDialog";
 import { UsersDialog } from "@/components/admin/UsersDialog";
 import { LocationsDialog } from "@/components/admin/LocationsDialog";
 import { useLocations } from "@/hooks/use-locations";
-import type { IncidentRow, StaffMember } from "@/components/admin/types";
+import type { StaffMember } from "@/components/admin/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -68,18 +69,7 @@ function AdminDashboard() {
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
 
-  const { data: incidents = [] } = useQuery({
-    queryKey: ["admin-incidents"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("incidents")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(500);
-      if (error) throw error;
-      return data as IncidentRow[];
-    },
-  });
+  const { data: incidents = [] } = useQuery(adminIncidentsOptions);
 
   const { data: staff = [] } = useQuery({
     queryKey: ["staff"],
@@ -194,6 +184,9 @@ function AdminDashboard() {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/relatorios"><FileBarChart /><span className="hidden sm:inline">Relatórios</span></Link>
+            </Button>
             <LocationsDialog />
             {me?.isAdmin && (
               <>
