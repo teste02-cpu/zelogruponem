@@ -1,4 +1,4 @@
 - [x] Revisão de segurança máxima
 - [x] Alerta no painel para problema recorrente do mesmo usuário (>2 vezes em 3 meses)
 - [x] Corrigir alerta de recorrência entre chamados com e sem login do Marcelo
-- [ ] Relatórios de manutenção para administradores com destaque para problemas recorrentes
+- [x] Relatórios de manutenção para administradores com destaque para problemas recorrentes

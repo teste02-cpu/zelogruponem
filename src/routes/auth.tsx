@@ -52,6 +52,8 @@ export const Route = createFileRoute("/auth")({
       { name: "description", content: "Entre na sua conta ou acesse o painel da equipe do Zelo." },
       { property: "og:title", content: "Entrar · Zelo" },
       { property: "og:description", content: "Acesse seus chamados ou o painel da equipe." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: AuthPage,

@@ -19,6 +19,8 @@ export const Route = createFileRoute("/meus-chamados")({
       { name: "description", content: "Acompanhe o status das ocorrências que você registrou neste aparelho." },
       { property: "og:title", content: "Meus chamados · Zelo" },
       { property: "og:description", content: "Acompanhe suas ocorrências de manutenção no campus." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: MyIncidents,

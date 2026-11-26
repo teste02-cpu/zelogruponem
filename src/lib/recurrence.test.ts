@@ -31,6 +31,14 @@ describe("recurrence across signed-in and anonymous reports", () => {
       { id: "2", user_id: "00000000-0000-0000-0000-000000000000", reporter_email: "M@x.com", reporter_name: "M", category: "Pintura", created_at: "2026-11-20T00:00:00Z" },
     ], now);
     expect(a.length).toBe(1);
+    expect(a[0]?.ids).toEqual(["1", "2"]);
+  });
+  it("links older account tickets without e-mail through another ticket from that account", () => {
+    const rows = [row("a", 1, { reporter_email: " MARCELO@example.test " }), row("b", 20), row("c", 30, { user_id: "00000000-0000-0000-0000-000000000000", reporter_email: "marcelo@example.test" })];
+    expect(findRecurrences(rows, now)[0]?.ids).toEqual(["a", "b", "c"]);
+  });
+  it("does not merge people with different e-mails or categories", () => {
+    expect(findRecurrences([row("a", 1, { reporter_email: "a@example.test" }), row("b", 2, { user_id: "u2", reporter_email: "b@example.test" }), row("c", 3, { category: "Pintura" })], now)).toHaveLength(0);
   });
 });
 

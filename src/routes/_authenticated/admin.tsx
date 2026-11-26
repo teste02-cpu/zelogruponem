@@ -51,6 +51,8 @@ export const Route = createFileRoute("/_authenticated/admin")({
         property: "og:description",
         content: "Gestão de chamados de infraestrutura universitária com priorização inteligente.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: AdminDashboard,
@@ -185,7 +187,7 @@ function AdminDashboard() {
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link to="/relatorios"><FileBarChart /><span className="hidden sm:inline">Relatórios</span></Link>
+              <Link to="/relatorios" aria-label="Relatórios" title="Relatórios"><FileBarChart /><span className="hidden sm:inline">Relatórios</span></Link>
             </Button>
             <LocationsDialog />
             {me?.isAdmin && (
