@@ -1,8 +1,15 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Camera, Columns3, List, LogOut, Search, FileBarChart } from "lucide-react";
+import { AlertTriangle, Camera, Columns3, List, LogOut, Search, FileBarChart, X } from "lucide-react";
 import { findRecurrences, RECURRENCE_WINDOW_DAYS } from "@/lib/recurrence";
+import {
+  dismissalKey,
+  dismissRecurrences,
+  readDismissedRecurrences,
+  restoreRecurrences,
+  splitRecurrences,
+} from "@/lib/recurrence-dismiss";
 import { adminIncidentsOptions } from "@/lib/admin-incidents";
 
 import { IncidentCard } from "@/components/admin/IncidentCard";
@@ -165,6 +172,25 @@ function AdminDashboard() {
   }, [incidents]);
 
   const recurrences = useMemo(() => findRecurrences(incidents), [incidents]);
+  const [dismissed, setDismissed] = useState<string[]>([]);
+
+  // The manager can close the heads-up; the choice lives on this device only.
+  useEffect(() => {
+    setDismissed(readDismissedRecurrences());
+  }, []);
+
+  const { visible: visibleRecurrences, hidden: hiddenRecurrences } = useMemo(
+    () => splitRecurrences(recurrences, dismissed),
+    [recurrences, dismissed],
+  );
+
+  function closeRecurrenceAlerts(keys: string[]) {
+    setDismissed(dismissRecurrences(recurrences, keys));
+  }
+
+  function reopenRecurrenceAlerts() {
+    setDismissed(restoreRecurrences(hiddenRecurrences.map(dismissalKey)));
+  }
 
   const selected = incidents.find((i) => i.id === openId) ?? null;
 
@@ -217,13 +243,24 @@ function AdminDashboard() {
           <Stat label="Concluídos hoje" value={stats.doneToday} tone="low" />
         </section>
 
-        {recurrences.length > 0 && (
+        {visibleRecurrences.length > 0 && (
           <section className="space-y-2 rounded-2xl border border-priority-high/40 bg-priority-high/10 p-4">
-            <p className="flex items-center gap-2 font-display text-lg font-bold text-priority-high">
-              <AlertTriangle className="size-5" /> Problemas recorrentes
-            </p>
+            <div className="flex items-start justify-between gap-2">
+              <p className="flex items-center gap-2 font-display text-lg font-bold text-priority-high">
+                <AlertTriangle className="size-5" /> Problemas recorrentes
+              </p>
+              <button
+                type="button"
+                onClick={() => closeRecurrenceAlerts(visibleRecurrences.map(dismissalKey))}
+                aria-label="Fechar alerta de problemas recorrentes"
+                title="Fechar alerta"
+                className="rounded-full p-1.5 text-priority-high/70 transition-colors hover:bg-priority-high/15 hover:text-priority-high"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
             <ul className="space-y-1 text-sm">
-              {recurrences.map((r) => (
+              {visibleRecurrences.map((r) => (
                 <li key={r.key} className="flex flex-wrap items-center gap-x-2">
                   <span>
                     <strong>{r.reporter}</strong> relatou <strong>{r.category}</strong> {r.ids.length} vezes nos
@@ -232,10 +269,27 @@ function AdminDashboard() {
                   <button type="button" className="font-medium text-primary underline" onClick={() => setOpenId(r.ids[0] ?? null)}>
                     Ver último
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => closeRecurrenceAlerts([dismissalKey(r)])}
+                    aria-label={`Ignorar alerta de ${r.reporter} sobre ${r.category}`}
+                    title="Ignorar este alerta"
+                    className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-priority-high/15 hover:text-priority-high"
+                  >
+                    <X className="size-3.5" />
+                  </button>
                 </li>
               ))}
             </ul>
           </section>
+        )}
+
+        {hiddenRecurrences.length > 0 && (
+          <Button variant="outline" size="sm" onClick={reopenRecurrenceAlerts} className="gap-2">
+            <AlertTriangle className="size-4 text-priority-high" />
+            Mostrar {hiddenRecurrences.length}{" "}
+            {hiddenRecurrences.length === 1 ? "alerta ignorado" : "alertas ignorados"}
+          </Button>
         )}
 
         <section className="flex flex-col gap-2 rounded-2xl border bg-card p-3 shadow-card lg:flex-row lg:items-center">
