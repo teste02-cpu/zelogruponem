@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
@@ -24,8 +24,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { deleteIncident, updateIncident } from "@/lib/incidents.functions";
+import { deleteIncident, getIncidentNotes, updateIncident } from "@/lib/incidents.functions";
 import { PRIORITY_LABEL, STATUS_LABEL, type IncidentStatus } from "@/lib/incident-meta";
+import { orderIncidentNotes } from "@/lib/incident-notes";
 import type { Priority } from "@/lib/priority";
 import { cn } from "@/lib/utils";
 import { ReporterEditsSection } from "./ReporterEditsSection";
@@ -50,6 +51,7 @@ const priorityActiveClass: Record<Priority, string> = {
 export function IncidentDetailSheet({ incident, photoUrl, staff, isAdmin, onOpenChange }: Props) {
   const update = useServerFn(updateIncident);
   const removeIncident = useServerFn(deleteIncident);
+  const loadNotes = useServerFn(getIncidentNotes);
   const qc = useQueryClient();
   const [status, setStatus] = useState<IncidentStatus>("pendente");
   const [assignee, setAssignee] = useState<string>("none");
@@ -59,16 +61,36 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, isAdmin, onOpen
   const [priority, setPriority] = useState<Priority>("media");
   const [priorityNote, setPriorityNote] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const incidentId = incident?.id;
+  const {
+    data: notesData = [],
+    isLoading: notesLoading,
+    isError: notesError,
+  } = useQuery({
+    queryKey: ["incident-notes", incidentId],
+    enabled: !!incidentId,
+    queryFn: () => {
+      if (!incidentId) throw new Error("Chamado inválido.");
+      return loadNotes({ data: { id: incidentId } });
+    },
+  });
+  const notes = orderIncidentNotes(notesData);
 
   useEffect(() => {
     if (!incident) return;
     setStatus(incident.status);
     setAssignee(incident.assigned_to ?? "none");
-    setNote(incident.resolution_note ?? "");
+    setNote("");
     setNotify(true);
     setPriority(incident.priority);
     setPriorityNote(incident.manager_priority_note ?? "");
   }, [incident]);
+
+  useEffect(() => {
+    const timeline = timelineRef.current;
+    if (notesData.length && timeline) timeline.scrollTop = timeline.scrollHeight;
+  }, [notesData]);
 
   async function save() {
     if (!incident) return;
@@ -79,7 +101,7 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, isAdmin, onOpen
           id: incident.id,
           status,
           assignedTo: assignee === "none" ? null : assignee,
-          resolutionNote: note.trim() || null,
+          newNote: note.trim(),
           notify,
           ...(priority !== incident.priority || !incident.priority_confirmed || priorityNote !== (incident.manager_priority_note ?? "")
             ? { priority, priorityNote: priorityNote.trim() || null }
@@ -87,6 +109,7 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, isAdmin, onOpen
         },
       });
       toast.success(res.notified ? "Chamado atualizado e solicitante notificado" : "Chamado atualizado");
+      await qc.invalidateQueries({ queryKey: ["incident-notes", incident.id] });
       qc.invalidateQueries({ queryKey: ["admin-incidents"] });
       onOpenChange(false);
     } catch (err) {
@@ -253,6 +276,34 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, isAdmin, onOpen
               <div className="space-y-2">
                 <Label>Nota da equipe {status === "concluido" && "(enviada ao solicitante)"}</Label>
                 <Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex.: Maçaneta substituída." />
+                <div
+                  ref={timelineRef}
+                  role="log"
+                  aria-label="Linha do tempo das notas da equipe"
+                  className="max-h-56 space-y-3 overflow-y-auto rounded-lg border p-3"
+                >
+                  {notesLoading ? (
+                    <p className="text-sm text-muted-foreground">Carregando histórico…</p>
+                  ) : notesError ? (
+                    <p className="text-sm text-destructive">Não foi possível carregar a linha do tempo.</p>
+                  ) : notes.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nenhuma nota registrada.</p>
+                  ) : (
+                    notes.map((entry) => (
+                      <article key={entry.id} className="border-b pb-3 last:border-0 last:pb-0">
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                          <span className="text-xs font-semibold">
+                            {staff.find((member) => member.id === entry.author_id)?.name ?? "Equipe"}
+                          </span>
+                          <time dateTime={entry.created_at} className="text-xs text-muted-foreground">
+                            {format(new Date(entry.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                          </time>
+                        </div>
+                        <p className="mt-1 whitespace-pre-wrap text-sm">{entry.note}</p>
+                      </article>
+                    ))
+                  )}
+                </div>
               </div>
 
               {statusChanged && (

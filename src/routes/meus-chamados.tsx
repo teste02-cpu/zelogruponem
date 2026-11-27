@@ -15,9 +15,9 @@ import { markResolvedSeen, readSeenResolved, readTrackedTickets } from "@/lib/tr
 export const Route = createFileRoute("/meus-chamados")({
   head: () => ({
     meta: [
-      { title: "Meus chamados · Zelo" },
+      { title: "Meus chamados · Infraestrutura NEM" },
       { name: "description", content: "Acompanhe o status das ocorrências que você registrou neste aparelho." },
-      { property: "og:title", content: "Meus chamados · Zelo" },
+      { property: "og:title", content: "Meus chamados · Infraestrutura NEM" },
       { property: "og:description", content: "Acompanhe suas ocorrências de manutenção no campus." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

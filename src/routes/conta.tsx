@@ -17,13 +17,13 @@ import { canReporterEdit } from "@/lib/reporter-edit";
 export const Route = createFileRoute("/conta")({
   head: () => ({
     meta: [
-      { title: "Minha conta · Zelo" },
+      { title: "Minha conta · Infraestrutura NEM" },
       {
         name: "description",
         content: "Acesse seus dados e acompanhe os chamados registrados na sua conta.",
       },
-      { property: "og:title", content: "Minha conta · Zelo" },
-      { property: "og:description", content: "Acompanhe seus chamados de manutenção e seus status no Zelo." },
+      { property: "og:title", content: "Minha conta · Infraestrutura NEM" },
+      { property: "og:description", content: "Acompanhe seus chamados de manutenção e seus status na Infraestrutura NEM." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

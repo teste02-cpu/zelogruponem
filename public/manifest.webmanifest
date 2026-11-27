@@ -1,6 +1,6 @@
 {
-  "name": "Zelo · Manutenção do Campus",
-  "short_name": "Zelo",
+  "name": "Infraestrutura NEM · Manutenção do Campus",
+  "short_name": "Infraestrutura NEM",
   "description": "Registre problemas de infraestrutura do campus com uma foto.",
   "start_url": "/",
   "scope": "/",

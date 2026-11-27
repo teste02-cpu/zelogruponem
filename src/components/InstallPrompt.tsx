@@ -21,7 +21,7 @@ function isIos() {
 }
 
 /**
- * On first use, offers to install a Zelo shortcut (home screen / desktop).
+ * On first use, offers to install an app shortcut (home screen / desktop).
  * Browsers never allow silent installs, so this asks the user once.
  */
 export function InstallPrompt() {
@@ -82,7 +82,7 @@ export function InstallPrompt() {
       <div className="flex items-start gap-3 pr-6">
         <img src="/icon-192.png" alt="" className="size-11 shrink-0 rounded-lg" />
         <div className="space-y-1">
-          <p className="font-semibold">Instalar o Zelo</p>
+          <p className="font-semibold">Instalar Infraestrutura NEM</p>
           {mode === "native" ? (
             <p className="text-sm text-muted-foreground">
               Crie um atalho na tela inicial ou na área de trabalho para abrir direto na câmera.

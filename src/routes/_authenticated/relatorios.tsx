@@ -21,9 +21,9 @@ export const Route = createFileRoute("/_authenticated/relatorios")({
   },
   loader: ({ context }) => context.queryClient.ensureQueryData(adminIncidentsOptions),
   head: () => ({ meta: [
-    { title: "Relatórios de manutenção · Zelo" },
+    { title: "Relatórios de manutenção · Infraestrutura NEM" },
     { name: "description", content: "Relatórios das manutenções do campus, status dos chamados e problemas recorrentes." },
-    { property: "og:title", content: "Relatórios de manutenção · Zelo" },
+    { property: "og:title", content: "Relatórios de manutenção · Infraestrutura NEM" },
     { property: "og:description", content: "Indicadores de manutenção e acompanhamento de problemas recorrentes no campus." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary" },
@@ -65,7 +65,7 @@ function MaintenanceReports() {
     <div className="maintenance-report min-h-dvh bg-background text-foreground">
       <header className="border-b print:hidden">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
-          <span className="font-display text-2xl font-extrabold">zelo</span>
+          <span className="font-display text-lg font-extrabold tracking-tight">Infraestrutura NEM</span>
           <Button asChild variant="outline" size="sm"><Link to="/admin"><ArrowLeft />Painel</Link></Button>
         </div>
       </header>
@@ -108,7 +108,7 @@ function MaintenanceReports() {
           {!rows.length && !invalidDates && <p className="py-6 text-center text-muted-foreground">Nenhum chamado com esses filtros.</p>}
           <div className="flex items-center justify-end gap-3 print:hidden"><span className="text-sm text-muted-foreground">Página {currentPage + 1} de {pageCount}</span><Button variant="outline" size="icon" aria-label="Página anterior" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}><ChevronLeft /></Button><Button variant="outline" size="icon" aria-label="Próxima página" disabled={currentPage + 1 >= pageCount} onClick={() => setPage(currentPage + 1)}><ChevronRight /></Button></div>
         </section>
-        <p className="border-t pt-3 text-xs text-muted-foreground">Zelo · Gerado em {format(new Date(), "dd/MM/yyyy HH:mm")} · Local: {filters.block === "all" ? "Todos" : filters.block} · Categoria: {filters.category === "all" ? "Todas" : filters.category} · Status: {filters.status === "all" ? "Todos" : STATUS_LABEL[filters.status as keyof typeof STATUS_LABEL]}{onlyRecurring ? " · Somente recorrentes" : ""}</p>
+        <p className="border-t pt-3 text-xs text-muted-foreground">Infraestrutura NEM · Gerado em {format(new Date(), "dd/MM/yyyy HH:mm")} · Local: {filters.block === "all" ? "Todos" : filters.block} · Categoria: {filters.category === "all" ? "Todas" : filters.category} · Status: {filters.status === "all" ? "Todos" : STATUS_LABEL[filters.status as keyof typeof STATUS_LABEL]}{onlyRecurring ? " · Somente recorrentes" : ""}</p>
       </main>
     </div>
   );
