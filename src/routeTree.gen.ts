@@ -16,6 +16,7 @@ import { Route as ContaRouteImport } from './routes/conta'
 import { Route as MeusChamadosRouteImport } from './routes/meus-chamados'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
+import { Route as ApiNotificationsCronRouteImport } from './routes/api.notifications.cron'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -51,6 +52,11 @@ const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
   path: '/relatorios',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiNotificationsCronRoute = ApiNotificationsCronRouteImport.update({
+  id: '/api/notifications/cron',
+  path: '/api/notifications/cron',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/meus-chamados': typeof MeusChamadosRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
+  '/api/notifications/cron': typeof ApiNotificationsCronRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/meus-chamados': typeof MeusChamadosRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
+  '/api/notifications/cron': typeof ApiNotificationsCronRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -77,13 +85,27 @@ export interface FileRoutesById {
   '/meus-chamados': typeof MeusChamadosRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
+  '/api/notifications/cron': typeof ApiNotificationsCronRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/auth' | '/conta' | '/meus-chamados' | '/admin' | '/relatorios'
+    | '/'
+    | '/auth'
+    | '/conta'
+    | '/meus-chamados'
+    | '/admin'
+    | '/relatorios'
+    | '/api/notifications/cron'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/conta' | '/meus-chamados' | '/admin' | '/relatorios'
+  to:
+    | '/'
+    | '/auth'
+    | '/conta'
+    | '/meus-chamados'
+    | '/admin'
+    | '/relatorios'
+    | '/api/notifications/cron'
   id:
     | '__root__'
     | '/'
@@ -93,6 +115,7 @@ export interface FileRouteTypes {
     | '/meus-chamados'
     | '/_authenticated/admin'
     | '/_authenticated/relatorios'
+    | '/api/notifications/cron'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -101,6 +124,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ContaRoute: typeof ContaRoute
   MeusChamadosRoute: typeof MeusChamadosRoute
+  ApiNotificationsCronRoute: typeof ApiNotificationsCronRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -154,6 +178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRelatoriosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/notifications/cron': {
+      id: '/api/notifications/cron'
+      path: '/api/notifications/cron'
+      fullPath: '/api/notifications/cron'
+      preLoaderRoute: typeof ApiNotificationsCronRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -176,6 +207,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ContaRoute: ContaRoute,
   MeusChamadosRoute: MeusChamadosRoute,
+  ApiNotificationsCronRoute: ApiNotificationsCronRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
