@@ -8,6 +8,8 @@ import { canReporterEdit, cleanReporterEdit, diffReporterEdit, type ReporterEdit
 
 const MAX_IMAGE_CHARS = 8_000_000;
 const IMAGE_RE = /^data:image\/(jpeg|png|webp);base64,/;
+const MAX_AUDIO_CHARS = 8_000_000;
+const AUDIO_RE = /^data:audio\/(webm|ogg|mp4|mpeg);base64,/;
 const ANONYMOUS_USER_ID = "00000000-0000-0000-0000-000000000000";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -33,6 +35,58 @@ export const analyzeIncidentPhoto = createServerFn({ method: "POST" })
       return { ok: true as const, analysis: await analyzePhoto(data.imageDataUrl) };
     } catch (error) {
       const message = error instanceof AiGatewayError ? error.message : "Não foi possível analisar a foto.";
+      return { ok: false as const, error: message };
+    }
+  });
+
+/** Rewrites the public report description after the user edits the AI title. */
+export const regenerateIncidentDescription = createServerFn({ method: "POST" })
+  .inputValidator((input: { category: string; title: string; location?: string }) => ({
+    category: String(input?.category ?? "Outros").trim().slice(0, 60),
+    title: String(input?.title ?? "").trim().slice(0, 120),
+    location: String(input?.location ?? "").trim().slice(0, 140),
+  }))
+  .handler(async ({ data }) => {
+    const { enforceRateLimit } = await import("./rate-limit.server");
+    try {
+      await enforceRateLimit("analyze");
+    } catch (error) {
+      return { ok: false as const, error: error instanceof Error ? error.message : "Tente novamente mais tarde." };
+    }
+    const { regenerateDescription } = await import("./ai/incident-ai.server");
+    const { AiGatewayError } = await import("./ai/gateway.server");
+    try {
+      return { ok: true as const, description: await regenerateDescription(data) };
+    } catch (error) {
+      const message = error instanceof AiGatewayError ? error.message : "Não foi possível atualizar a descrição.";
+      return { ok: false as const, error: message };
+    }
+  });
+
+export const transcribeIncidentDescriptionAudio = createServerFn({ method: "POST" })
+  .inputValidator((input: { audioDataUrl: string }) => {
+    if (
+      typeof input?.audioDataUrl !== "string" ||
+      !AUDIO_RE.test(input.audioDataUrl) ||
+      input.audioDataUrl.length > MAX_AUDIO_CHARS
+    ) {
+      throw new Error("Áudio inválido.");
+    }
+    return { audioDataUrl: input.audioDataUrl };
+  })
+  .handler(async ({ data }) => {
+    const { enforceRateLimit } = await import("./rate-limit.server");
+    try {
+      await enforceRateLimit("analyze");
+    } catch (error) {
+      return { ok: false as const, error: error instanceof Error ? error.message : "Tente novamente mais tarde." };
+    }
+    const { transcribeDescriptionAudio } = await import("./ai/incident-ai.server");
+    const { AiGatewayError } = await import("./ai/gateway.server");
+    try {
+      return { ok: true as const, text: await transcribeDescriptionAudio(data.audioDataUrl) };
+    } catch (error) {
+      const message = error instanceof AiGatewayError ? error.message : "Não foi possível transcrever o áudio.";
       return { ok: false as const, error: message };
     }
   });

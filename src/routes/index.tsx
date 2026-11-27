@@ -1,16 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   Bell,
   CheckCircle2,
   Loader2,
+  Mic,
   QrCode,
   RotateCcw,
   ShieldCheck,
   Sparkles,
+  Square,
 } from "lucide-react";
 
 import { CameraView } from "@/components/capture/CameraView";
@@ -30,6 +32,8 @@ import {
   analyzeIncidentPhoto,
   createIncident,
   getTrackedIncidents,
+  regenerateIncidentDescription,
+  transcribeIncidentDescriptionAudio,
 } from "@/lib/incidents.functions";
 import { CATEGORIES, parseLocationCode } from "@/lib/incident-meta";
 import { useLocations } from "@/hooks/use-locations";
@@ -69,6 +73,8 @@ function CapturePage() {
   const analyze = useServerFn(analyzeIncidentPhoto);
   const create = useServerFn(createIncident);
   const tracked = useServerFn(getTrackedIncidents);
+  const regenerateDescription = useServerFn(regenerateIncidentDescription);
+  const transcribeAudio = useServerFn(transcribeIncidentDescriptionAudio);
 
   const { blocks, roomsOf } = useLocations();
   const [step, setStep] = useState<Step>("camera");
@@ -86,6 +92,166 @@ function CapturePage() {
   const [submitting, setSubmitting] = useState(false);
   const [protocol, setProtocol] = useState<string | null>(null);
   const [sentWithEmail, setSentWithEmail] = useState(false);
+  const [regeneratingDescription, setRegeneratingDescription] = useState(false);
+  const [audioState, setAudioState] = useState<"idle" | "recording" | "transcribing">("idle");
+  const titleEditTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const titleRequestSequenceRef = useRef(0);
+  const titleWasEditedManuallyRef = useRef(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  useEffect(() => {
+    return () => {
+      if (titleEditTimerRef.current) clearTimeout(titleEditTimerRef.current);
+      titleRequestSequenceRef.current++;
+      if (mediaRecorderRef.current?.state === "recording") {
+        mediaRecorderRef.current.onstop = null;
+        mediaRecorderRef.current.stop();
+      }
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  const regenerateDescriptionFromTitle = useCallback(async (nextTitle: string) => {
+    const cleanTitle = nextTitle.trim();
+    if (cleanTitle.length < 2) {
+      titleRequestSequenceRef.current++;
+      setRegeneratingDescription(false);
+      return;
+    }
+
+    const sequence = ++titleRequestSequenceRef.current;
+    setRegeneratingDescription(true);
+    try {
+      const res = await regenerateDescription({
+        data: {
+          category,
+          title: cleanTitle,
+          location: [block, room].filter(Boolean).join(" - "),
+        },
+      });
+      if (sequence !== titleRequestSequenceRef.current) return;
+      if (res.ok) {
+        setDescription(res.description);
+        setAiNote(null);
+      } else {
+        setAiNote(res.error);
+      }
+    } catch {
+      if (sequence === titleRequestSequenceRef.current) {
+        setAiNote("Não foi possível atualizar a descrição. Edite-a manualmente.");
+      }
+    } finally {
+      if (sequence === titleRequestSequenceRef.current) setRegeneratingDescription(false);
+    }
+  }, [block, category, regenerateDescription, room]);
+
+  const scheduleTitleDescriptionRegeneration = useCallback((nextTitle: string) => {
+    if (titleEditTimerRef.current) clearTimeout(titleEditTimerRef.current);
+    titleEditTimerRef.current = setTimeout(() => {
+      titleEditTimerRef.current = null;
+      void regenerateDescriptionFromTitle(nextTitle);
+    }, 650);
+  }, [regenerateDescriptionFromTitle]);
+
+  const finishTitleEdit = useCallback((nextTitle: string) => {
+    if (titleEditTimerRef.current) {
+      clearTimeout(titleEditTimerRef.current);
+      titleEditTimerRef.current = null;
+    }
+    if (titleWasEditedManuallyRef.current) {
+      void regenerateDescriptionFromTitle(nextTitle);
+    }
+  }, [regenerateDescriptionFromTitle]);
+
+  function stopAudioCapture() {
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+    } else {
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+  }
+
+  async function startAudioCapture() {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      toast.error("Gravação de áudio não é suportada neste navegador.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType =
+        ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"]
+          .find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+
+      mediaStreamRef.current = stream;
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+        mediaRecorderRef.current = null;
+
+        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        audioChunksRef.current = [];
+        if (blob.size === 0) {
+          setAudioState("idle");
+          toast.error("Não foi possível capturar o áudio.");
+          return;
+        }
+
+        setAudioState("transcribing");
+        try {
+          const audioDataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result));
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(blob);
+          });
+          const res = await transcribeAudio({ data: { audioDataUrl } });
+          if (!res.ok) {
+            toast.error(res.error);
+            setAiNote(res.error);
+          } else {
+            const text = res.text.trim();
+            if (text) {
+              setDescription((current) => current.trim() ? `${current.trim()} ${text}` : text);
+              setAiNote(null);
+            } else {
+              toast.error("Não foi possível reconhecer fala no áudio.");
+            }
+          }
+        } catch {
+          const message = "Não foi possível transcrever o áudio.";
+          toast.error(message);
+          setAiNote(message);
+        } finally {
+          setAudioState("idle");
+        }
+      };
+      recorder.start();
+      setAudioState("recording");
+      setAiNote(null);
+    } catch (error) {
+      const permissionDenied =
+        error instanceof DOMException &&
+        (error.name === "NotAllowedError" || error.name === "PermissionDeniedError");
+      const message = permissionDenied
+        ? "Permissão do microfone negada. Libere o acesso nas configurações do navegador."
+        : "Não foi possível acessar o microfone.";
+      toast.error(message);
+      setAiNote(message);
+      setAudioState("idle");
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -127,6 +293,12 @@ function CapturePage() {
   });
 
   async function handleCapture(dataUrl: string) {
+    titleWasEditedManuallyRef.current = false;
+    titleRequestSequenceRef.current++;
+    if (titleEditTimerRef.current) {
+      clearTimeout(titleEditTimerRef.current);
+      titleEditTimerRef.current = null;
+    }
     setPhoto(dataUrl);
     setStep("review");
     setAnalyzing(true);
@@ -157,6 +329,21 @@ function CapturePage() {
   }, []);
 
   function reset() {
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.onstop = null;
+      mediaRecorderRef.current.stop();
+    }
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+    mediaRecorderRef.current = null;
+    setAudioState("idle");
+    titleWasEditedManuallyRef.current = false;
+    titleRequestSequenceRef.current++;
+    if (titleEditTimerRef.current) {
+      clearTimeout(titleEditTimerRef.current);
+      titleEditTimerRef.current = null;
+    }
+    setRegeneratingDescription(false);
     setStep("camera");
     setPhoto(null);
     setTitle("");
@@ -377,7 +564,13 @@ function CapturePage() {
                 </Label>
                 <Input
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => {
+                    const nextTitle = e.target.value;
+                    titleWasEditedManuallyRef.current = true;
+                    setTitle(nextTitle);
+                    scheduleTitleDescriptionRegeneration(nextTitle);
+                  }}
+                  onBlur={(e) => finishTitleEdit(e.target.value)}
                   placeholder={analyzing ? "Gerando…" : "Ex.: Maçaneta danificada"}
                   disabled={analyzing}
                 />
@@ -385,9 +578,34 @@ function CapturePage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="flex items-center gap-1.5">
-                Descrição do problema <AiTag loading={analyzing} />
-              </Label>
+              <div className="flex items-center justify-between gap-3">
+                <Label className="flex items-center gap-1.5">
+                  Descrição do problema <AiTag loading={analyzing || regeneratingDescription} />
+                </Label>
+                {audioState === "recording" ? (
+                  <button
+                    type="button"
+                    onClick={stopAudioCapture}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full bg-destructive px-3 text-sm font-medium text-destructive-foreground"
+                  >
+                    <Square className="size-3.5 fill-current" /> Parar
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void startAudioCapture()}
+                    disabled={analyzing || audioState === "transcribing"}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-3 text-sm font-medium text-primary disabled:opacity-50"
+                  >
+                    {audioState === "transcribing" ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Mic className="size-4" />
+                    )}
+                    {audioState === "transcribing" ? "Transcrevendo…" : "Falar"}
+                  </button>
+                )}
+              </div>
               <Textarea
                 rows={4}
                 value={description}
@@ -406,7 +624,7 @@ function CapturePage() {
               type="submit"
               size="lg"
               className="h-14 w-full rounded-2xl text-base font-semibold"
-              disabled={submitting || analyzing}
+              disabled={submitting || analyzing || audioState !== "idle"}
             >
               {submitting && <Loader2 className="animate-spin" />}
               Registrar Ocorrência

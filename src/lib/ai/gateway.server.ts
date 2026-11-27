@@ -1,5 +1,5 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { jsonSchema, Output, streamText, type ModelMessage } from "ai";
+import { jsonSchema, Output, streamText, transcribe, type ModelMessage } from "ai";
 
 import { createLovableAiGatewayRunIdFetch } from "./run-id.server";
 
@@ -12,6 +12,34 @@ export class AiGatewayError extends Error {
     public status: number,
   ) {
     super(message);
+  }
+}
+
+export async function runAudioTranscription(input: {
+  audio: Uint8Array;
+}): Promise<string> {
+  const apiKey = process.env["LOVABLE_API_KEY"];
+  if (!apiKey) throw new AiGatewayError(friendlyMessage(401), 401);
+
+  const runIdFetch = createLovableAiGatewayRunIdFetch();
+  const provider = createOpenAI({
+    baseURL: GATEWAY_URL,
+    apiKey,
+    headers: { "Lovable-API-Key": apiKey, "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
+    fetch: runIdFetch.fetch,
+  });
+
+  try {
+    const result = await transcribe({
+      model: provider.transcription("gpt-4o-mini-transcribe"),
+      audio: input.audio,
+    });
+    return result.text.trim().slice(0, 1000);
+  } catch (error) {
+    const source = error as { statusCode?: number; message?: string; responseBody?: string };
+    const status = typeof source.statusCode === "number" ? source.statusCode : 500;
+    console.error("[ai] transcription failed", status, source.message, source.responseBody?.slice?.(0, 500));
+    throw new AiGatewayError(friendlyMessage(status), status);
   }
 }
 
