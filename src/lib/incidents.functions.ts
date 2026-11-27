@@ -155,11 +155,28 @@ export const createIncident = createServerFn({ method: "POST" })
 
     const location = [data.block, data.room].filter(Boolean).join(" - ");
     const { prioritizeIncident } = await import("./ai/incident-ai.server");
+    const { pickSimilarCases, formatHistory } = await import("./priority-history");
+    // Learn from the managers: recent tickets whose final priority they confirmed.
+    const { data: confirmed } = await supabaseAdmin
+      .from("incidents")
+      .select("category, block, title, description, location, ai_priority, priority, manager_priority_note")
+      .eq("priority_confirmed", true)
+      .order("priority_set_at", { ascending: false })
+      .limit(300);
+    const history = formatHistory(
+      pickSimilarCases(confirmed ?? [], {
+        category: data.category,
+        block: data.block || null,
+        title: data.title,
+        description: data.description,
+      }),
+    );
     const verdict = await prioritizeIncident({
       category: data.category,
       title: data.title,
       description: data.description,
       location,
+      history,
     });
 
     // Inserts bypass RLS on purpose: nobody writes incidents directly, so the

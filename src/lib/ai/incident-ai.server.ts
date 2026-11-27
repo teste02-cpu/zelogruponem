@@ -130,13 +130,16 @@ export async function prioritizeIncident(input: {
   title: string;
   description: string;
   location: string;
+  /** Past manager decisions on similar tickets (see priority-history.ts). */
+  history?: string;
 }): Promise<{ priority: Priority; justification: string; source: "ia" | "regra" }> {
   try {
     const ai = await runStructured<{ priority: Priority; justification: string }>({
       instructions: `Você é o motor de priorização de chamados de manutenção de uma universidade.
 ${PRIORITY_RULE_TEXT}
 Avalie a CATEGORIA, a DESCRIÇÃO e o LOCAL. Considere quem é afetado (salas de aula, banheiros e laboratórios têm alto fluxo de alunos).
-Retorne a prioridade e uma justificativa curta (1-2 frases, em português) que o gestor possa ler e entender o porquê.`,
+Se houver histórico de decisões dos gestores, siga o padrão deles para casos parecidos e mencione isso na justificativa.
+Retorne a prioridade e uma justificativa curta (1-2 frases, em português) que o gestor possa ler e entender o porquê.${input.history ? `\n\n${input.history}` : ""}`,
       messages: [
         {
           role: "user",
