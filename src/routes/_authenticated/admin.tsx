@@ -25,7 +25,6 @@ import { adminIncidentsOptions } from "@/lib/admin-incidents";
 import { IncidentCard } from "@/components/admin/IncidentCard";
 import { IncidentDetailSheet } from "@/components/admin/IncidentDetailSheet";
 import { TeamDialog } from "@/components/admin/TeamDialog";
-import { UsersDialog } from "@/components/admin/UsersDialog";
 import { LocationsDialog } from "@/components/admin/LocationsDialog";
 import { useLocations } from "@/hooks/use-locations";
 import type { StaffMember } from "@/components/admin/types";
@@ -239,10 +238,7 @@ function AdminDashboard() {
             </Button>
             <LocationsDialog />
             {me?.isAdmin && (
-              <>
-                <UsersDialog currentUserId={me.id} />
-                <TeamDialog currentUserId={me.id} />
-              </>
+              <TeamDialog currentUserId={me.id} />
             )}
             <Button variant="outline" size="sm" asChild>
               <Link to="/">
