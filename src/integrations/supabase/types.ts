@@ -314,16 +314,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_incident_note: {
+        Args: { _incident_id: string; _note: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
-      }
-      add_incident_note: {
-        Args: { _incident_id: string; _note: string }
-        Returns: string
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
     }
