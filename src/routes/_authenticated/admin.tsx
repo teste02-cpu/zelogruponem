@@ -17,6 +17,7 @@ import { IncidentDetailSheet } from "@/components/admin/IncidentDetailSheet";
 import { TeamDialog } from "@/components/admin/TeamDialog";
 import { UsersDialog } from "@/components/admin/UsersDialog";
 import { LocationsDialog } from "@/components/admin/LocationsDialog";
+import { useLocations } from "@/hooks/use-locations";
 import type { StaffMember } from "@/components/admin/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,6 +84,7 @@ function AdminDashboard() {
   const [openId, setOpenId] = useState<string | null>(null);
 
   const { data: incidents = [] } = useQuery(adminIncidentsOptions);
+  const { all: campusLocations } = useLocations();
 
   const { data: staff = [] } = useQuery({
     queryKey: ["staff"],
@@ -132,7 +134,11 @@ function AdminDashboard() {
             ? !i.priority_confirmed
             : i.priority_confirmed && i.priority === priority),
       )
-      .filter((i) => block === "all" || incidentMatchesCampusFloor(i.block, i.location, block))
+      .filter(
+        (i) =>
+          block === "all" ||
+          incidentMatchesCampusFloor(i.block, i.location, block, campusLocations),
+      )
       .filter((i) => status === "all" || i.status === status)
       .filter(
         (i) =>
@@ -147,7 +153,7 @@ function AdminDashboard() {
           PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] ||
           +new Date(b.created_at) - +new Date(a.created_at),
       );
-  }, [incidents, priority, block, status, search]);
+  }, [incidents, priority, block, status, search, campusLocations]);
 
   const stats = useMemo(() => {
     const open = incidents.filter((i) => i.status !== "concluido");

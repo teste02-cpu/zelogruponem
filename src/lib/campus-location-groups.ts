@@ -33,10 +33,30 @@ export function incidentMatchesCampusFloor(
   block: string | null,
   location: string | null,
   floor: CampusFloor,
+  campusLocations: readonly CampusLocation[] = [],
 ): boolean {
-  return (
-    campusFloorForBlock(block ?? "") === floor || campusFloorForBlock(location ?? "") === floor
+  const blockFloor = campusFloorForBlock(block ?? "");
+  const locationFloor = campusFloorForBlock(location ?? "");
+
+  if (blockFloor && locationFloor && blockFloor !== locationFloor) return false;
+  const explicitFloor = blockFloor ?? locationFloor;
+  if (explicitFloor) return explicitFloor === floor;
+
+  const roomLabel = normalizeRoomLabel(location ?? "");
+  if (!roomLabel) return false;
+
+  const matchingFloors = new Set(
+    campusLocations
+      .filter((campusLocation) => normalizeRoomLabel(campusLocation.room ?? "") === roomLabel)
+      .map((campusLocation) => campusFloorForBlock(campusLocation.block))
+      .filter((campusFloor): campusFloor is CampusFloor => campusFloor !== undefined),
   );
+
+  return matchingFloors.size === 1 && matchingFloors.has(floor);
+}
+
+function normalizeRoomLabel(room: string): string {
+  return room.normalize("NFKC").toLocaleUpperCase("pt-BR").replace(/\s+/g, " ").trim();
 }
 
 export function removeCampusFloorLabel(detail: string): string {

@@ -99,4 +99,46 @@ describe("groupCampusLocationsByFloor", () => {
     );
     expect(incidentMatchesCampusFloor("BLOCO C", "BLOCO C - Sala 02", "2º ANDAR")).toBe(false);
   });
+
+  it("resolves room-only incidents from saved location metadata, including inactive records", () => {
+    const savedLocations = [
+      { ...location("1", "BLOCO A 1º ANDAR", "Sala 05"), active: false },
+      location("2", "Localização não informada", "SALA  05"),
+    ];
+
+    expect(incidentMatchesCampusFloor("Bloco A", " sala   05 ", "1º ANDAR", savedLocations)).toBe(
+      true,
+    );
+    expect(incidentMatchesCampusFloor("Bloco A", "SALA 05", "2º ANDAR", savedLocations)).toBe(
+      false,
+    );
+  });
+
+  it("does not infer a floor from a block letter or an unclassified room", () => {
+    const savedLocations = [location("1", "Área Externa", "Sala 05")];
+
+    expect(incidentMatchesCampusFloor("Bloco A", "Sala 99", "1º ANDAR", savedLocations)).toBe(
+      false,
+    );
+    expect(incidentMatchesCampusFloor("Bloco A", "Sala 05", "1º ANDAR", savedLocations)).toBe(
+      false,
+    );
+  });
+
+  it("leaves duplicate room labels across floors ambiguous unless the incident names a floor", () => {
+    const savedLocations = [
+      location("1", "BLOCO A 1º ANDAR", "Sala 05"),
+      location("2", "BLOCO B 2º ANDAR", "SALA  05"),
+    ];
+
+    expect(incidentMatchesCampusFloor("Bloco A", "Sala 05", "1º ANDAR", savedLocations)).toBe(
+      false,
+    );
+    expect(incidentMatchesCampusFloor("Bloco A", "Sala 05", "2º ANDAR", savedLocations)).toBe(
+      false,
+    );
+    expect(
+      incidentMatchesCampusFloor("BLOCO A 1º ANDAR", "Sala 05", "1º ANDAR", savedLocations),
+    ).toBe(true);
+  });
 });
