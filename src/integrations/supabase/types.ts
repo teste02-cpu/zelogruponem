@@ -43,6 +43,45 @@ export type Database = {
           },
         ]
       }
+      incident_notes: {
+        Row: {
+          author_id: string | null
+          created_at: string
+          id: string
+          incident_id: string
+          note: string
+        }
+        Insert: {
+          author_id?: string | null
+          created_at?: string
+          id?: string
+          incident_id: string
+          note: string
+        }
+        Update: {
+          author_id?: string | null
+          created_at?: string
+          id?: string
+          incident_id?: string
+          note?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_notes_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incident_notes_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incidents: {
         Row: {
           ai_priority: Database["public"]["Enums"]["incident_priority"] | null
@@ -281,6 +320,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      add_incident_note: {
+        Args: { _incident_id: string; _note: string }
+        Returns: string
       }
       is_staff: { Args: { _user_id: string }; Returns: boolean }
     }

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { normalizeIncidentNote } from "./incident-notes";
 import type { IncidentStatus } from "./incident-meta";
 import { normalizeOptionalEmail } from "./rate-limit";
 import { canReporterEdit, cleanReporterEdit, diffReporterEdit, type ReporterEditFields } from "./reporter-edit";
@@ -268,22 +269,52 @@ type UpdateIncidentInput = {
   priorityNote?: string | null;
   status?: IncidentStatus;
   assignedTo?: string | null;
-  resolutionNote?: string | null;
+  newNote?: string;
   notify?: boolean;
 };
+
+/** Admin — load the chronological notes for one incident. */
+export const getIncidentNotes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { id: string }) => {
+    if (typeof input?.id !== "string" || !UUID_RE.test(input.id)) {
+      throw new Error("Chamado inválido.");
+    }
+    return { id: input.id };
+  })
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin, error: roleError } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (roleError) throw new Error("Não foi possível verificar sua permissão.");
+    if (!isAdmin) throw new Error("Apenas administradores podem ver as notas da equipe.");
+
+    const { data: notes, error } = await context.supabase
+      .from("incident_notes")
+      .select("id, author_id, note, created_at")
+      .eq("incident_id", data.id)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true });
+    if (error) throw new Error("Não foi possível carregar a linha do tempo.");
+    return notes ?? [];
+  });
 
 /** Admin — change status / assignee and notify the reporter. */
 export const updateIncident = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: UpdateIncidentInput) => {
-    if (!input?.id) throw new Error("Chamado inválido.");
+    if (typeof input?.id !== "string" || !UUID_RE.test(input.id)) throw new Error("Chamado inválido.");
+    if (input.newNote !== undefined && typeof input.newNote !== "string") {
+      throw new Error("Nota inválida.");
+    }
     if (input.status && !["pendente", "em_andamento", "concluido"].includes(input.status)) {
       throw new Error("Status inválido.");
     }
     if (input.priority && !["alta", "media", "baixa"].includes(input.priority)) {
       throw new Error("Prioridade inválida.");
     }
-    return input;
+    return { ...input, newNote: normalizeIncidentNote(input.newNote) ?? "" };
   })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -292,7 +323,7 @@ export const updateIncident = createServerFn({ method: "POST" })
 
     const { data: current, error: readErr } = await supabase
       .from("incidents")
-      .select("id, user_id, title, location, status")
+      .select("id, user_id, title, location, status, resolution_note")
       .eq("id", data.id)
       .single();
     if (readErr || !current) throw new Error("Chamado não encontrado.");
@@ -300,7 +331,6 @@ export const updateIncident = createServerFn({ method: "POST" })
     const patch: {
       status?: IncidentStatus;
       assigned_to?: string | null;
-      resolution_note?: string | null;
       priority?: "alta" | "media" | "baixa";
       priority_confirmed?: boolean;
       priority_set_by?: string;
@@ -316,17 +346,24 @@ export const updateIncident = createServerFn({ method: "POST" })
     }
     if (data.status) patch.status = data.status;
     if (data.assignedTo !== undefined) patch.assigned_to = data.assignedTo;
-    if (data.resolutionNote !== undefined) patch.resolution_note = data.resolutionNote?.slice(0, 1000) ?? null;
 
     const { error } = await supabase.from("incidents").update(patch).eq("id", data.id);
     if (error) throw new Error("Não foi possível atualizar o chamado.");
+
+    if (data.newNote) {
+      const { error: noteError } = await supabase.rpc("add_incident_note", {
+        _incident_id: data.id,
+        _note: data.newNote,
+      });
+      if (noteError) throw new Error("Chamado atualizado, mas não foi possível registrar a nota da equipe.");
+    }
 
     let notified = false;
     const statusChanged = data.status && data.status !== current.status;
     if (statusChanged && (data.notify ?? true) && data.status !== "pendente") {
       const message =
         data.status === "concluido"
-          ? `Seu chamado "${current.title}" (${current.location}) foi resolvido.${data.resolutionNote ? ` Nota da equipe: ${data.resolutionNote}` : ""}`
+          ? `Seu chamado "${current.title}" (${current.location}) foi resolvido.${data.newNote || current.resolution_note ? ` Nota da equipe: ${data.newNote || current.resolution_note}` : ""}`
           : `Seu chamado "${current.title}" (${current.location}) está em atendimento pela equipe de manutenção.`;
       if (current.user_id === ANONYMOUS_USER_ID) {
         // Login-free reporter: the new status shows up in "Meus chamados" on their device.

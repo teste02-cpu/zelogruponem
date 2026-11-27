@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { MapPin, Plus, Trash2 } from "lucide-react";
+import { MapPin, Plus, Trash2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -10,11 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { locationsQueryKey, useLocations, type CampusLocation } from "@/hooks/use-locations";
 import { supabase } from "@/integrations/supabase/client";
+import { campusLocationKey, parseCampusLocationFile, type ImportedCampusLocation } from "@/lib/campus-location-import";
 
 /** Staff: register the campus blocks/buildings and rooms offered in the report form. */
 export function LocationsDialog() {
   const qc = useQueryClient();
   const { all } = useLocations();
+  const fileInput = useRef<HTMLInputElement>(null);
   const [block, setBlock] = useState("");
   const [room, setRoom] = useState("");
   const [busy, setBusy] = useState(false);
@@ -52,6 +54,54 @@ export function LocationsDialog() {
     refresh();
   }
 
+  async function importLocations(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = "";
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("O arquivo deve ter no máximo 10 MB.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const imported = await parseCampusLocationFile(file);
+      const known = new Set(all.map((location) => campusLocationKey(location.block, location.room)));
+      const additions: ImportedCampusLocation[] = [];
+      let ignored = imported.duplicates;
+      for (const location of imported.locations) {
+        const key = campusLocationKey(location.block, location.room);
+        if (known.has(key)) {
+          ignored++;
+          continue;
+        }
+        known.add(key);
+        additions.push(location);
+      }
+
+      if (additions.length === 0) {
+        toast.info("Todos os ambientes do arquivo já estão cadastrados.");
+        return;
+      }
+
+      const { error } = await supabase.from("locations").insert(additions);
+      if (error) {
+        toast.error(error.code === "23505"
+          ? "Algum ambiente do arquivo já foi cadastrado. Atualize a lista e tente novamente."
+          : "Não foi possível importar os ambientes.");
+        return;
+      }
+
+      const ignoredMessage = ignored ? ` ${ignored} duplicado(s) ignorado(s).` : "";
+      toast.success(`${additions.length} ambiente(s) importado(s).${ignoredMessage}`);
+      refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível ler o arquivo.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function setActive(id: string, active: boolean) {
     const { error } = await supabase.from("locations").update({ active }).eq("id", id);
     if (error) toast.error("Não foi possível alterar o local.");
@@ -81,6 +131,21 @@ export function LocationsDialog() {
             Blocos, prédios e salas que aparecem para quem registra um chamado. Locais desativados somem do formulário.
           </DialogDescription>
         </DialogHeader>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Input
+            ref={fileInput}
+            type="file"
+            accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            className="sr-only"
+            onChange={importLocations}
+            aria-label="Arquivo CSV ou XLSX com ambientes"
+          />
+          <Button type="button" variant="outline" disabled={busy} onClick={() => fileInput.current?.click()}>
+            <Upload /> Importar ambientes (CSV/XLSX)
+          </Button>
+          <p className="text-xs text-muted-foreground">Colunas necessárias: Nome e Localização. Máximo de 10 MB.</p>
+        </div>
 
         <form onSubmit={add} className="grid grid-cols-1 gap-2 rounded-xl border bg-muted/40 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
           <div className="space-y-1.5">
