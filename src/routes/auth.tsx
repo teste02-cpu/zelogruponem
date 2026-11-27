@@ -48,9 +48,9 @@ export const Route = createFileRoute("/auth")({
   }),
   head: () => ({
     meta: [
-      { title: "Entrar · Zelo" },
-      { name: "description", content: "Entre na sua conta ou acesse o painel da equipe do Zelo." },
-      { property: "og:title", content: "Entrar · Zelo" },
+      { title: "Entrar · Infraestrutura NEM" },
+      { name: "description", content: "Entre na sua conta ou acesse o painel da equipe de Infraestrutura NEM." },
+      { property: "og:title", content: "Entrar · Infraestrutura NEM" },
       { property: "og:description", content: "Acesse seus chamados ou o painel da equipe." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -160,10 +160,10 @@ function AuthPage() {
             <span className="grid size-10 place-items-center rounded-xl bg-primary text-primary-foreground">
               <Camera className="size-5" />
             </span>
-            <span className="font-display text-2xl font-extrabold">zelo</span>
+            <span className="font-display text-lg font-extrabold tracking-tight">Infraestrutura NEM</span>
           </div>
           <h1 className="mt-10 text-4xl font-extrabold leading-[1.05]">
-            Entrar no Zelo
+            Entrar na Infraestrutura NEM
             <span className="block text-primary">Sua conta e seus chamados.</span>
           </h1>
           <p className="mt-4 text-muted-foreground">

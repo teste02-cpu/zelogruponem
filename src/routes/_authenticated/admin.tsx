@@ -47,13 +47,13 @@ export const Route = createFileRoute("/_authenticated/admin")({
   },
   head: () => ({
     meta: [
-      { title: "Painel de manutenção · Zelo" },
+      { title: "Painel de manutenção · Infraestrutura NEM" },
       {
         name: "description",
         content:
           "Chamados do campus priorizados por IA: filtre, atribua responsáveis e notifique a resolução.",
       },
-      { property: "og:title", content: "Painel de manutenção · Zelo" },
+      { property: "og:title", content: "Painel de manutenção · Infraestrutura NEM" },
       {
         property: "og:description",
         content: "Gestão de chamados de infraestrutura universitária com priorização inteligente.",
@@ -206,7 +206,7 @@ function AdminDashboard() {
       <header className="sticky top-0 z-20 border-b bg-background/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-3">
-            <span className="font-display text-2xl font-extrabold">zelo</span>
+            <span className="font-display text-lg font-extrabold tracking-tight">Infraestrutura NEM</span>
             <span className="hidden rounded-full bg-ink px-2.5 py-1 font-mono text-[11px] uppercase tracking-wider text-ink-foreground sm:inline">
               Painel de manutenção
             </span>

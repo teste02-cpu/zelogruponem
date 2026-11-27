@@ -45,13 +45,13 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Registrar ocorrência · Zelo" },
+      { title: "Registrar ocorrência · Infraestrutura NEM" },
       {
         name: "description",
         content:
           "Abra a câmera, fotografe o problema e registre a ocorrência em segundos, sem precisar de login.",
       },
-      { property: "og:title", content: "Registrar ocorrência · Zelo" },
+      { property: "og:title", content: "Registrar ocorrência · Infraestrutura NEM" },
       {
         property: "og:description",
         content: "Fotografe o problema do campus e a IA preenche o chamado para você.",
@@ -214,7 +214,7 @@ function CapturePage() {
   return (
     <div className="dark flex h-dvh flex-col bg-background text-foreground">
       <header className="flex items-center justify-between px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <span className="font-display text-xl font-extrabold">zelo</span>
+        <span className="font-display text-sm font-extrabold tracking-tight">Infraestrutura NEM</span>
         <nav className="flex items-center gap-1">
           <Link
             to="/admin"
