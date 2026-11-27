@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { CampusLocation } from "@/hooks/use-locations";
-import { groupCampusLocationsByFloor } from "@/lib/campus-location-groups";
+import {
+  groupCampusLocationsByFloor,
+  removeCampusFloorLabel,
+  roomsForCampusFloor,
+} from "@/lib/campus-location-groups";
 
 const location = (id: string, block: string, room: string | null): CampusLocation => ({
   id,
@@ -44,5 +48,22 @@ describe("groupCampusLocationsByFloor", () => {
       ["1º ANDAR", []],
       ["2º ANDAR", []],
     ]);
+  });
+
+  it("offers room suggestions from all persisted labels classified to the selected floor", () => {
+    const locations = [
+      location("1", "BLOCO A 1º ANDAR", "Sala 05"),
+      location("2", "BLOCO B 1° ANDAR", "Sala 05"),
+      location("3", "BLOCO B 2º ANDAR", "Biblioteca"),
+      location("4", "Área Externa", "Quadra"),
+    ];
+
+    expect(roomsForCampusFloor(locations, "1º ANDAR")).toEqual(["Sala 05"]);
+    expect(roomsForCampusFloor(locations, "2º ANDAR")).toEqual(["Biblioteca"]);
+  });
+
+  it("removes a recognized floor label from a scanned room detail", () => {
+    expect(removeCampusFloorLabel("1º ANDAR - Sala 05")).toBe("Sala 05");
+    expect(removeCampusFloorLabel("Sala 24 - 2° ANDAR")).toBe("Sala 24");
   });
 });
