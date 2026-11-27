@@ -1,8 +1,18 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Camera, Columns3, List, LogOut, Search, FileBarChart, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Camera,
+  Columns3,
+  List,
+  LogOut,
+  Search,
+  FileBarChart,
+  X,
+} from "lucide-react";
 import { findRecurrences, RECURRENCE_WINDOW_DAYS } from "@/lib/recurrence";
+import { isVisibleOnAdminDashboard } from "@/lib/admin-dashboard";
 import {
   dismissalKey,
   dismissRecurrences,
@@ -77,8 +87,16 @@ function AdminDashboard() {
   const [status, setStatus] = useState<"all" | IncidentStatus>("all");
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [today, setToday] = useState(() => new Date());
 
   const { data: incidents = [] } = useQuery(adminIncidentsOptions);
+
+  useEffect(() => {
+    const now = new Date();
+    const nextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const timer = window.setTimeout(() => setToday(new Date()), nextDay.getTime() - now.getTime());
+    return () => window.clearTimeout(timer);
+  }, [today]);
 
   const { data: staff = [] } = useQuery({
     queryKey: ["staff"],
@@ -133,6 +151,7 @@ function AdminDashboard() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return incidents
+      .filter((i) => isVisibleOnAdminDashboard(i, today))
       .filter(
         (i) =>
           priority === "all" ||
@@ -155,21 +174,21 @@ function AdminDashboard() {
           PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] ||
           +new Date(b.created_at) - +new Date(a.created_at),
       );
-  }, [incidents, priority, block, status, search]);
+  }, [incidents, priority, block, status, search, today]);
 
   const stats = useMemo(() => {
     const open = incidents.filter((i) => i.status !== "concluido");
-    const today = new Date().toDateString();
+    const localToday = today.toDateString();
     return {
       open: open.length,
       high: open.filter((i) => i.priority_confirmed && i.priority === "alta").length,
       triage: open.filter((i) => !i.priority_confirmed).length,
       progress: incidents.filter((i) => i.status === "em_andamento").length,
       doneToday: incidents.filter(
-        (i) => i.resolved_at && new Date(i.resolved_at).toDateString() === today,
+        (i) => i.resolved_at && new Date(i.resolved_at).toDateString() === localToday,
       ).length,
     };
-  }, [incidents]);
+  }, [incidents, today]);
 
   const recurrences = useMemo(() => findRecurrences(incidents), [incidents]);
   const [dismissed, setDismissed] = useState<string[]>([]);
@@ -206,14 +225,19 @@ function AdminDashboard() {
       <header className="sticky top-0 z-20 border-b bg-background/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-3">
-            <span className="font-display text-lg font-extrabold tracking-tight">Infraestrutura NEM</span>
+            <span className="font-display text-lg font-extrabold tracking-tight">
+              Infraestrutura NEM
+            </span>
             <span className="hidden rounded-full bg-ink px-2.5 py-1 font-mono text-[11px] uppercase tracking-wider text-ink-foreground sm:inline">
               Painel de manutenção
             </span>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link to="/relatorios" aria-label="Relatórios" title="Relatórios"><FileBarChart /><span className="hidden sm:inline">Relatórios</span></Link>
+              <Link to="/relatorios" aria-label="Relatórios" title="Relatórios">
+                <FileBarChart />
+                <span className="hidden sm:inline">Relatórios</span>
+              </Link>
             </Button>
             <LocationsDialog />
             {me?.isAdmin && (
@@ -263,10 +287,14 @@ function AdminDashboard() {
               {visibleRecurrences.map((r) => (
                 <li key={r.key} className="flex flex-wrap items-center gap-x-2">
                   <span>
-                    <strong>{r.reporter}</strong> relatou <strong>{r.category}</strong> {r.ids.length} vezes nos
-                    últimos {RECURRENCE_WINDOW_DAYS} dias.
+                    <strong>{r.reporter}</strong> relatou <strong>{r.category}</strong>{" "}
+                    {r.ids.length} vezes nos últimos {RECURRENCE_WINDOW_DAYS} dias.
                   </span>
-                  <button type="button" className="font-medium text-primary underline" onClick={() => setOpenId(r.ids[0] ?? null)}>
+                  <button
+                    type="button"
+                    className="font-medium text-primary underline"
+                    onClick={() => setOpenId(r.ids[0] ?? null)}
+                  >
                     Ver último
                   </button>
                   <button
