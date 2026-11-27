@@ -52,6 +52,69 @@ Não invente localização nem informações que não estejam visíveis.`,
   };
 }
 
+export function buildDescriptionFromTitlePrompt(input: {
+  category: string;
+  title: string;
+  location: string;
+}): string {
+  return `Categoria: ${input.category}
+Título informado pelo usuário: ${input.title}
+Local: ${input.location || "Não informado"}`;
+}
+
+const descriptionSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["description"],
+  properties: {
+    description: { type: "string" },
+  },
+};
+
+export async function regenerateDescription(input: {
+  category: string;
+  title: string;
+  location: string;
+}): Promise<string> {
+  const title = input.title.trim().slice(0, 120);
+  if (title.length < 2) throw new Error("Informe um título.");
+
+  const result = await runStructured<{ description: string }>({
+    instructions: `Você é um técnico de manutenção predial de uma universidade brasileira.
+Reescreva a descrição do problema a partir do título informado pelo usuário.
+Responda sempre em português do Brasil.
+- Use 1 ou 2 frases objetivas.
+- Preserve fielmente o problema indicado pelo título.
+- Considere a categoria e o local fornecidos.
+- Não invente causas, danos ou informações não sustentadas pelo título.
+- Retorne uma descrição curta e adequada para um chamado de manutenção.`,
+    messages: [
+      {
+        role: "user",
+        content: buildDescriptionFromTitlePrompt({
+          category: input.category.trim().slice(0, 60),
+          title,
+          location: input.location.trim().slice(0, 140),
+        }),
+      },
+    ],
+    schema: descriptionSchema,
+    effort: "low",
+  });
+
+  return result.description.trim().slice(0, 1000);
+}
+
+export async function transcribeDescriptionAudio(audioDataUrl: string): Promise<string> {
+  const [, , base64 = ""] =
+    audioDataUrl.match(/^data:(audio\/(?:webm|ogg|mp4|mpeg));base64,(.+)$/) ?? [];
+  if (!base64) throw new Error("Áudio inválido.");
+
+  const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+  const { runAudioTranscription } = await import("./gateway.server");
+  return runAudioTranscription({ audio: bytes });
+}
+
 const prioritySchema = {
   type: "object",
   additionalProperties: false,
