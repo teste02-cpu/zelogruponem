@@ -13,7 +13,15 @@ export function campusFloorForBlock(block: string): CampusFloor | undefined {
   const normalizedBlock = block.trim().toLocaleUpperCase("pt-BR");
   const floor = CAMPUS_FLOORS.find((candidate) => candidate === normalizedBlock);
   if (floor) return floor;
-  return LEGACY_FLOOR_BLOCKS[normalizedBlock];
+  const legacyFloor = LEGACY_FLOOR_BLOCKS[normalizedBlock];
+  if (legacyFloor) return legacyFloor;
+
+  const ordinalFloor = normalizedBlock.match(
+    /(?:^|[^0-9])0*([12])\s*(?:\.?\s*[º°ª]|O)?\.?\s*ANDAR\b/,
+  );
+  if (ordinalFloor) return ordinalFloor[1] === "1" ? CAMPUS_FLOORS[0] : CAMPUS_FLOORS[1];
+
+  return undefined;
 }
 
 export function groupCampusLocationsByFloor(
