@@ -4,6 +4,7 @@ import type { CampusLocation } from "@/hooks/use-locations";
 import {
   CAMPUS_FLOORS,
   groupCampusLocationsByFloor,
+  incidentMatchesCampusFloor,
   removeCampusFloorLabel,
   roomsForCampusFloor,
   type CampusFloor,
@@ -83,5 +84,19 @@ describe("groupCampusLocationsByFloor", () => {
   it("removes a recognized floor label from a scanned room detail", () => {
     expect(removeCampusFloorLabel("1º ANDAR - Sala 05")).toBe("Sala 05");
     expect(removeCampusFloorLabel("Sala 24 - 2° ANDAR")).toBe("Sala 24");
+  });
+
+  it("matches historical incidents by normalized block or saved location", () => {
+    expect(incidentMatchesCampusFloor("BLOCO 1", "BLOCO 1 - GINASIO GRUPONEM", "1º ANDAR")).toBe(
+      true,
+    );
+    expect(incidentMatchesCampusFloor(null, "BLOCO B 2° ANDAR - BIBLIOTECA", "2º ANDAR")).toBe(
+      true,
+    );
+    expect(incidentMatchesCampusFloor("BLOCO A 1 . º ANDAR", "Sala 05", "1º ANDAR")).toBe(true);
+    expect(incidentMatchesCampusFloor("Área Externa", "Área Externa - Quadra", "1º ANDAR")).toBe(
+      false,
+    );
+    expect(incidentMatchesCampusFloor("BLOCO C", "BLOCO C - Sala 02", "2º ANDAR")).toBe(false);
   });
 });

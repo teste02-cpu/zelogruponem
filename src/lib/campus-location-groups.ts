@@ -15,13 +15,28 @@ export function campusFloorForBlock(block: string): CampusFloor | undefined {
   const normalizedBlock = block.trim().toLocaleUpperCase("pt-BR");
   const floor = CAMPUS_FLOORS.find((candidate) => candidate === normalizedBlock);
   if (floor) return floor;
-  const legacyFloor = LEGACY_FLOOR_BLOCKS[normalizedBlock];
+  const legacyFloor = Object.entries(LEGACY_FLOOR_BLOCKS).find(
+    ([label]) =>
+      normalizedBlock === label ||
+      (normalizedBlock.startsWith(label) &&
+        /^[\s\-–,:|]/.test(normalizedBlock.slice(label.length))),
+  )?.[1];
   if (legacyFloor) return legacyFloor;
 
   const ordinalFloor = normalizedBlock.match(FLOOR_LABEL);
   if (ordinalFloor) return ordinalFloor[1] === "1" ? CAMPUS_FLOORS[0] : CAMPUS_FLOORS[1];
 
   return undefined;
+}
+
+export function incidentMatchesCampusFloor(
+  block: string | null,
+  location: string | null,
+  floor: CampusFloor,
+): boolean {
+  return (
+    campusFloorForBlock(block ?? "") === floor || campusFloorForBlock(location ?? "") === floor
+  );
 }
 
 export function removeCampusFloorLabel(detail: string): string {
