@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import type { CampusLocation } from "@/hooks/use-locations";
 import {
+  CAMPUS_FLOORS,
   groupCampusLocationsByFloor,
   removeCampusFloorLabel,
   roomsForCampusFloor,
+  type CampusFloor,
 } from "@/lib/campus-location-groups";
 
 const location = (id: string, block: string, room: string | null): CampusLocation => ({
@@ -60,6 +62,22 @@ describe("groupCampusLocationsByFloor", () => {
 
     expect(roomsForCampusFloor(locations, "1º ANDAR")).toEqual(["Sala 05"]);
     expect(roomsForCampusFloor(locations, "2º ANDAR")).toEqual(["Biblioteca"]);
+  });
+
+  it("switches environment options when changing between the two floors", () => {
+    const locations = [
+      location("1", "BLOCO A 1º ANDAR", "Sala 05"),
+      location("2", "BLOCO B 2° ANDAR", "Biblioteca"),
+      location("3", "Área Externa", "Quadra"),
+    ];
+    const selectedFloors: CampusFloor[] = ["1º ANDAR", "2º ANDAR", "1º ANDAR"];
+
+    expect(CAMPUS_FLOORS).toEqual(["1º ANDAR", "2º ANDAR"]);
+    expect(selectedFloors.map((floor) => roomsForCampusFloor(locations, floor))).toEqual([
+      ["Sala 05"],
+      ["Biblioteca"],
+      ["Sala 05"],
+    ]);
   });
 
   it("removes a recognized floor label from a scanned room detail", () => {
