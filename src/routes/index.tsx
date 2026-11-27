@@ -38,6 +38,12 @@ import {
 import { CATEGORIES, parseLocationCode } from "@/lib/incident-meta";
 import { useLocations } from "@/hooks/use-locations";
 import {
+  CAMPUS_FLOORS,
+  campusFloorForBlock,
+  removeCampusFloorLabel,
+  type CampusFloor,
+} from "@/lib/campus-location-groups";
+import {
   addTrackedTicket,
   readReporter,
   readSeenResolved,
@@ -76,14 +82,14 @@ function CapturePage() {
   const regenerateDescription = useServerFn(regenerateIncidentDescription);
   const transcribeAudio = useServerFn(transcribeIncidentDescriptionAudio);
 
-  const { blocks, roomsOf } = useLocations();
+  const { roomsOfFloor } = useLocations();
   const [step, setStep] = useState<Step>("camera");
   const [photo, setPhoto] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [aiNote, setAiNote] = useState<string | null>(null);
   const [reporterName, setReporterName] = useState("");
   const [reporterEmail, setReporterEmail] = useState("");
-  const [block, setBlock] = useState("");
+  const [block, setBlock] = useState<CampusFloor | "">("");
   const [room, setRoom] = useState("");
   const [category, setCategory] = useState<string>("Outros");
   const [title, setTitle] = useState("");
@@ -323,8 +329,16 @@ function CapturePage() {
 
   const onQr = useCallback((text: string) => {
     const parsed = parseLocationCode(text);
-    if (parsed.block) setBlock(parsed.block);
-    setRoom(parsed.room);
+    const floor =
+      campusFloorForBlock(parsed.block ?? "") ??
+      campusFloorForBlock(parsed.room) ??
+      campusFloorForBlock(text);
+    setBlock(floor ?? "");
+    setRoom(
+      floor
+        ? removeCampusFloorLabel(parsed.room)
+        : [parsed.block, parsed.room].filter(Boolean).join(" - "),
+    );
     toast.success("Local identificado pelo QR Code");
   }, []);
 
@@ -510,14 +524,20 @@ function CapturePage() {
                 </button>
               </div>
               <div className="grid grid-cols-[1fr_1.2fr] gap-2">
-                <Select value={block} onValueChange={setBlock}>
+                <Select
+                  value={block}
+                  onValueChange={(value) => {
+                    const floor = CAMPUS_FLOORS.find((candidate) => candidate === value);
+                    if (floor) setBlock(floor);
+                  }}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Bloco" />
+                    <SelectValue placeholder="Andar" />
                   </SelectTrigger>
                   <SelectContent className="dark">
-                    {(block && !blocks.includes(block) ? [block, ...blocks] : blocks).map((b) => (
-                      <SelectItem key={b} value={b}>
-                        {b}
+                    {CAMPUS_FLOORS.map((floor) => (
+                      <SelectItem key={floor} value={floor}>
+                        {floor}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -525,15 +545,15 @@ function CapturePage() {
                 <Input
                   list="room-options"
                   placeholder={
-                    block && roomsOf(block).length
+                    block && roomsOfFloor(block).length
                       ? "Escolha ou digite a sala"
-                      : "Sala 05, Banheiro 2º andar…"
+                      : "Sala 05, Banheiro…"
                   }
                   value={room}
                   onChange={(e) => setRoom(e.target.value)}
                 />
                 <datalist id="room-options">
-                  {(block ? roomsOf(block) : []).map((r) => (
+                  {(block ? roomsOfFloor(block) : []).map((r) => (
                     <option key={r} value={r} />
                   ))}
                 </datalist>

@@ -1,6 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { supabase } from "@/integrations/supabase/client";
+import {
+  roomsForCampusFloor,
+  type CampusFloor,
+} from "@/lib/campus-location-groups";
 
 export type CampusLocation = { id: string; block: string; room: string | null; active: boolean };
 
@@ -26,5 +30,6 @@ export function useLocations() {
       .filter((l) => l.block === block && l.room)
       .map((l) => l.room as string)
       .sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }));
-  return { ...query, all, blocks, roomsOf };
+  const roomsOfFloor = (floor: CampusFloor) => roomsForCampusFloor(active, floor);
+  return { ...query, all, blocks, roomsOf, roomsOfFloor };
 }
