@@ -90,7 +90,10 @@ function CapturePage() {
   const [reporterName, setReporterName] = useState("");
   const [reporterEmail, setReporterEmail] = useState("");
   const [block, setBlock] = useState<CampusFloor | "">("");
+  const [environment, setEnvironment] = useState("");
   const [room, setRoom] = useState("");
+  const selectedRoom = room.trim() || environment;
+  const roomOptions = block ? roomsOfFloor(block) : [];
   const [category, setCategory] = useState<string>("Outros");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -134,7 +137,7 @@ function CapturePage() {
         data: {
           category,
           title: cleanTitle,
-          location: [block, room].filter(Boolean).join(" - "),
+          location: [block, selectedRoom].filter(Boolean).join(" - "),
         },
       });
       if (sequence !== titleRequestSequenceRef.current) return;
@@ -151,7 +154,7 @@ function CapturePage() {
     } finally {
       if (sequence === titleRequestSequenceRef.current) setRegeneratingDescription(false);
     }
-  }, [block, category, regenerateDescription, room]);
+  }, [block, category, regenerateDescription, selectedRoom]);
 
   const scheduleTitleDescriptionRegeneration = useCallback((nextTitle: string) => {
     if (titleEditTimerRef.current) clearTimeout(titleEditTimerRef.current);
@@ -334,6 +337,7 @@ function CapturePage() {
       campusFloorForBlock(parsed.room) ??
       campusFloorForBlock(text);
     setBlock(floor ?? "");
+    setEnvironment("");
     setRoom(
       floor
         ? removeCampusFloorLabel(parsed.room)
@@ -370,7 +374,7 @@ function CapturePage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!photo) return;
-    if (!block && !room.trim()) {
+    if (!block && !selectedRoom) {
       toast.error("Informe a localização.");
       return;
     }
@@ -389,7 +393,7 @@ function CapturePage() {
           reporterEmail,
           ...(sessionData.session ? { accessToken: sessionData.session.access_token } : {}),
           block,
-          room,
+          room: selectedRoom,
           category,
           title,
           description,
@@ -528,7 +532,10 @@ function CapturePage() {
                   value={block}
                   onValueChange={(value) => {
                     const floor = CAMPUS_FLOORS.find((candidate) => candidate === value);
-                    if (floor) setBlock(floor);
+                    if (floor) {
+                      if (floor !== block) setEnvironment("");
+                      setBlock(floor);
+                    }
                   }}
                 >
                   <SelectTrigger>
@@ -542,21 +549,43 @@ function CapturePage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Input
-                  list="room-options"
-                  placeholder={
-                    block && roomsOfFloor(block).length
-                      ? "Escolha ou digite a sala"
-                      : "Sala 05, Banheiro…"
-                  }
-                  value={room}
-                  onChange={(e) => setRoom(e.target.value)}
-                />
-                <datalist id="room-options">
-                  {(block ? roomsOfFloor(block) : []).map((r) => (
-                    <option key={r} value={r} />
-                  ))}
-                </datalist>
+                <div className="space-y-2">
+                  <Select
+                    value={environment}
+                    onValueChange={(value) => {
+                      setRoom("");
+                      setEnvironment(value);
+                    }}
+                    disabled={!block || roomOptions.length === 0}
+                  >
+                    <SelectTrigger aria-label="Ambiente cadastrado">
+                      <SelectValue
+                        placeholder={
+                          block
+                            ? roomOptions.length
+                              ? "Ambientes deste andar"
+                              : "Nenhum ambiente cadastrado"
+                            : "Selecione o andar primeiro"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent className="dark">
+                      {roomOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder="Ou digite outro ambiente"
+                    value={room}
+                    onChange={(e) => {
+                      setEnvironment("");
+                      setRoom(e.target.value);
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
