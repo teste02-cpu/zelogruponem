@@ -7,26 +7,29 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { locationsQueryKey, useLocations, type CampusLocation } from "@/hooks/use-locations";
 import { supabase } from "@/integrations/supabase/client";
+import { CAMPUS_FLOORS, groupCampusLocationsByFloor } from "@/lib/campus-location-groups";
 import { campusLocationKey, parseCampusLocationFile, type ImportedCampusLocation } from "@/lib/campus-location-import";
 
-/** Staff: register the campus blocks/buildings and rooms offered in the report form. */
+/** Staff: register the campus floors and rooms offered in the report form. */
 export function LocationsDialog() {
   const qc = useQueryClient();
   const { all } = useLocations();
   const fileInput = useRef<HTMLInputElement>(null);
-  const [block, setBlock] = useState("");
+  const [block, setBlock] = useState<(typeof CAMPUS_FLOORS)[number]>(CAMPUS_FLOORS[0]);
   const [room, setRoom] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const grouped = useMemo(() => {
-    const map = new Map<string, CampusLocation[]>();
-    for (const l of all) map.set(l.block, [...(map.get(l.block) ?? []), l]);
-    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b, "pt-BR"));
-  }, [all]);
-  const blockNames = grouped.map(([b]) => b);
+  const grouped = useMemo(() => groupCampusLocationsByFloor(all), [all]);
 
   const refresh = () => qc.invalidateQueries({ queryKey: locationsQueryKey });
 
@@ -40,8 +43,10 @@ export function LocationsDialog() {
     }
     setBusy(true);
     const rows: { block: string; room: string | null }[] = [];
-    // A room in a new block also registers the block itself.
-    if (r && !blockNames.some((n) => n.toLowerCase() === b.toLowerCase())) rows.push({ block: b, room: null });
+    // A room in a new floor also registers the floor itself.
+    if (r && !all.some((location) => location.block.trim().toLocaleUpperCase("pt-BR") === b)) {
+      rows.push({ block: b, room: null });
+    }
     rows.push({ block: b, room: r || null });
     const { error } = await supabase.from("locations").insert(rows);
     setBusy(false);
@@ -128,7 +133,7 @@ export function LocationsDialog() {
         <DialogHeader>
           <DialogTitle>Localizações do campus</DialogTitle>
           <DialogDescription>
-            Blocos, prédios e salas que aparecem para quem registra um chamado. Locais desativados somem do formulário.
+            Exibimos apenas os locais cadastrados em 1º e 2º andar. Os demais cadastros permanecem salvos e ocultos até que o andar seja definido. Locais desativados somem do formulário.
           </DialogDescription>
         </DialogHeader>
 
@@ -149,13 +154,25 @@ export function LocationsDialog() {
 
         <form onSubmit={add} className="grid grid-cols-1 gap-2 rounded-xl border bg-muted/40 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
           <div className="space-y-1.5">
-            <Label htmlFor="loc-block">Bloco / prédio</Label>
-            <Input id="loc-block" list="loc-blocks" value={block} onChange={(e) => setBlock(e.target.value)} placeholder="Ex.: Bloco F" />
-            <datalist id="loc-blocks">
-              {blockNames.map((b) => (
-                <option key={b} value={b} />
-              ))}
-            </datalist>
+            <Label htmlFor="loc-block">Andar</Label>
+            <Select
+              value={block}
+              onValueChange={(value) => {
+                const floor = CAMPUS_FLOORS.find((candidate) => candidate === value);
+                if (floor) setBlock(floor);
+              }}
+            >
+              <SelectTrigger id="loc-block" aria-label="Andar">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CAMPUS_FLOORS.map((floor) => (
+                  <SelectItem key={floor} value={floor}>
+                    {floor}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="loc-room">
@@ -169,7 +186,6 @@ export function LocationsDialog() {
         </form>
 
         <div className="space-y-4">
-          {grouped.length === 0 && <p className="text-sm text-muted-foreground">Nenhum local cadastrado.</p>}
           {grouped.map(([b, items]) => {
             const head = items.find((l) => !l.room);
             const rooms = items.filter((l) => l.room);
@@ -201,7 +217,11 @@ export function LocationsDialog() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="px-3 py-2 text-xs text-muted-foreground">Sem salas cadastradas — quem reporta digita o local.</p>
+                  <p className="px-3 py-2 text-xs text-muted-foreground">
+                    {head
+                      ? "Sem salas cadastradas — quem reporta digita o local."
+                      : "Nenhum local cadastrado neste andar."}
+                  </p>
                 )}
               </section>
             );
