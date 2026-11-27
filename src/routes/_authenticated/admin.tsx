@@ -48,6 +48,11 @@ import {
   type IncidentStatus,
 } from "@/lib/incident-meta";
 import type { Priority } from "@/lib/priority";
+import {
+  CAMPUS_FLOORS,
+  incidentMatchesCampusFloor,
+  type CampusFloor,
+} from "@/lib/campus-location-groups";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -83,13 +88,14 @@ function AdminDashboard() {
   const navigate = useNavigate();
   const [view, setView] = useState<"kanban" | "lista">("kanban");
   const [priority, setPriority] = useState<"all" | "triagem" | Priority>("all");
-  const [block, setBlock] = useState<string>("all");
+  const [block, setBlock] = useState<"all" | CampusFloor>("all");
   const [status, setStatus] = useState<"all" | IncidentStatus>("all");
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [today, setToday] = useState(() => new Date());
 
   const { data: incidents = [] } = useQuery(adminIncidentsOptions);
+  const { all: campusLocations } = useLocations();
 
   useEffect(() => {
     const now = new Date();
@@ -133,18 +139,6 @@ function AdminDashboard() {
     };
   }, [qc]);
 
-  const { blocks: registeredBlocks } = useLocations();
-  const blockOptions = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          ...registeredBlocks,
-          ...incidents.map((i) => i.block).filter((b): b is string => !!b),
-        ]),
-      ).sort((a, b) => a.localeCompare(b, "pt-BR")),
-    [registeredBlocks, incidents],
-  );
-
   const staffName = useMemo(() => Object.fromEntries(staff.map((s) => [s.id, s.name])), [staff]);
   const { data: urls = {} } = useSignedUrls(incidents.map((i) => i.photo_path));
 
@@ -159,7 +153,11 @@ function AdminDashboard() {
             ? !i.priority_confirmed
             : i.priority_confirmed && i.priority === priority),
       )
-      .filter((i) => block === "all" || i.block === block)
+      .filter(
+        (i) =>
+          block === "all" ||
+          incidentMatchesCampusFloor(i.block, i.location, block, campusLocations),
+      )
       .filter((i) => status === "all" || i.status === status)
       .filter(
         (i) =>
@@ -174,7 +172,7 @@ function AdminDashboard() {
           PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] ||
           +new Date(b.created_at) - +new Date(a.created_at),
       );
-  }, [incidents, priority, block, status, search, today]);
+  }, [incidents, priority, block, status, search, campusLocations, today]);
 
   const stats = useMemo(() => {
     const open = incidents.filter((i) => i.status !== "concluido");
@@ -345,15 +343,24 @@ function AdminDashboard() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={block} onValueChange={setBlock}>
+            <Select
+              value={block}
+              onValueChange={(value) => {
+                if (value === "all") setBlock("all");
+                else {
+                  const floor = CAMPUS_FLOORS.find((candidate) => candidate === value);
+                  if (floor) setBlock(floor);
+                }
+              }}
+            >
               <SelectTrigger className="lg:w-36">
-                <SelectValue placeholder="Bloco" />
+                <SelectValue placeholder="Local" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os locais</SelectItem>
-                {blockOptions.map((b) => (
-                  <SelectItem key={b} value={b}>
-                    {b}
+                {CAMPUS_FLOORS.map((floor) => (
+                  <SelectItem key={floor} value={floor}>
+                    {floor}
                   </SelectItem>
                 ))}
               </SelectContent>
