@@ -157,15 +157,15 @@ export function LocationsDialog() {
           <MapPin /> <span className="hidden sm:inline">Locais</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden sm:max-w-lg">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Localizações do campus</DialogTitle>
           <DialogDescription>
             Exibimos apenas os locais cadastrados em 1º e 2º andar. Os demais cadastros permanecem salvos e ocultos até que o andar seja definido. Locais desativados somem do formulário.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
           <Input
             ref={fileInput}
             type="file"
@@ -180,7 +180,7 @@ export function LocationsDialog() {
           <p className="text-xs text-muted-foreground">Colunas necessárias: Nome e Localização. Máximo de 10 MB.</p>
         </div>
 
-        <form onSubmit={add} className="grid grid-cols-1 gap-2 rounded-xl border bg-muted/40 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+        <form onSubmit={add} className="grid shrink-0 grid-cols-1 gap-2 rounded-xl border bg-muted/40 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
           <div className="space-y-1.5">
             <Label htmlFor="loc-block">Andar</Label>
             <Select
@@ -213,7 +213,7 @@ export function LocationsDialog() {
           </Button>
         </form>
 
-        <div className="space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain">
           {grouped.map(([b, items]) => {
             const heads = items.filter((l) => !l.room);
             const rooms = items.filter((l) => l.room);
