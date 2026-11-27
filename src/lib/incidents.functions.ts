@@ -4,7 +4,13 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { normalizeIncidentNote } from "./incident-notes";
 import type { IncidentStatus } from "./incident-meta";
 import { normalizeOptionalEmail } from "./rate-limit";
-import { canReporterEdit, cleanReporterEdit, diffReporterEdit, type ReporterEditFields } from "./reporter-edit";
+import {
+  canReporterEdit,
+  cleanReporterEdit,
+  diffReporterEdit,
+  type ReporterEditFields,
+} from "./reporter-edit";
+import { newlyCompleted } from "./notifications/logic";
 
 const MAX_IMAGE_CHARS = 8_000_000;
 const IMAGE_RE = /^data:image\/(jpeg|png|webp);base64,/;
@@ -21,20 +27,26 @@ function checkImage(value: unknown): string {
 
 /** Step 1 — public (no login): ask the vision model to pre-fill the form. */
 export const analyzeIncidentPhoto = createServerFn({ method: "POST" })
-  .inputValidator((input: { imageDataUrl: string }) => ({ imageDataUrl: checkImage(input?.imageDataUrl) }))
+  .inputValidator((input: { imageDataUrl: string }) => ({
+    imageDataUrl: checkImage(input?.imageDataUrl),
+  }))
   .handler(async ({ data }) => {
     const { enforceRateLimit } = await import("./rate-limit.server");
     try {
       await enforceRateLimit("analyze");
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : "Tente novamente mais tarde." };
+      return {
+        ok: false as const,
+        error: error instanceof Error ? error.message : "Tente novamente mais tarde.",
+      };
     }
     const { analyzePhoto } = await import("./ai/incident-ai.server");
     const { AiGatewayError } = await import("./ai/gateway.server");
     try {
       return { ok: true as const, analysis: await analyzePhoto(data.imageDataUrl) };
     } catch (error) {
-      const message = error instanceof AiGatewayError ? error.message : "Não foi possível analisar a foto.";
+      const message =
+        error instanceof AiGatewayError ? error.message : "Não foi possível analisar a foto.";
       return { ok: false as const, error: message };
     }
   });
@@ -42,23 +54,33 @@ export const analyzeIncidentPhoto = createServerFn({ method: "POST" })
 /** Rewrites the public report description after the user edits the AI title. */
 export const regenerateIncidentDescription = createServerFn({ method: "POST" })
   .inputValidator((input: { category: string; title: string; location?: string }) => ({
-    category: String(input?.category ?? "Outros").trim().slice(0, 60),
-    title: String(input?.title ?? "").trim().slice(0, 120),
-    location: String(input?.location ?? "").trim().slice(0, 140),
+    category: String(input?.category ?? "Outros")
+      .trim()
+      .slice(0, 60),
+    title: String(input?.title ?? "")
+      .trim()
+      .slice(0, 120),
+    location: String(input?.location ?? "")
+      .trim()
+      .slice(0, 140),
   }))
   .handler(async ({ data }) => {
     const { enforceRateLimit } = await import("./rate-limit.server");
     try {
       await enforceRateLimit("analyze");
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : "Tente novamente mais tarde." };
+      return {
+        ok: false as const,
+        error: error instanceof Error ? error.message : "Tente novamente mais tarde.",
+      };
     }
     const { regenerateDescription } = await import("./ai/incident-ai.server");
     const { AiGatewayError } = await import("./ai/gateway.server");
     try {
       return { ok: true as const, description: await regenerateDescription(data) };
     } catch (error) {
-      const message = error instanceof AiGatewayError ? error.message : "Não foi possível atualizar a descrição.";
+      const message =
+        error instanceof AiGatewayError ? error.message : "Não foi possível atualizar a descrição.";
       return { ok: false as const, error: message };
     }
   });
@@ -79,19 +101,24 @@ export const transcribeIncidentDescriptionAudio = createServerFn({ method: "POST
     try {
       await enforceRateLimit("analyze");
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : "Tente novamente mais tarde." };
+      return {
+        ok: false as const,
+        error: error instanceof Error ? error.message : "Tente novamente mais tarde.",
+      };
     }
     const { transcribeDescriptionAudio } = await import("./ai/incident-ai.server");
     const { AiGatewayError } = await import("./ai/gateway.server");
     try {
       return { ok: true as const, text: await transcribeDescriptionAudio(data.audioDataUrl) };
     } catch (error) {
-      const message = error instanceof AiGatewayError ? error.message : "Não foi possível transcrever o áudio.";
+      const message =
+        error instanceof AiGatewayError ? error.message : "Não foi possível transcrever o áudio.";
       return { ok: false as const, error: message };
     }
   });
 
 type CreateIncidentInput = {
+  submissionKey: string;
   imageDataUrl: string;
   reporterName?: string;
   reporterEmail?: string;
@@ -106,20 +133,36 @@ type CreateIncidentInput = {
 /** Step 2 — public "Registrar Ocorrência": login is optional; the server stores and prioritizes the ticket. */
 export const createIncident = createServerFn({ method: "POST" })
   .inputValidator((input: CreateIncidentInput) => {
+    if (typeof input?.submissionKey !== "string" || !UUID_RE.test(input.submissionKey)) {
+      throw new Error("Envio inválido.");
+    }
     const email = normalizeOptionalEmail(input?.reporterEmail);
     if (email === "invalid") throw new Error("E-mail inválido.");
     const accessToken = typeof input?.accessToken === "string" ? input.accessToken.trim() : "";
     if (accessToken.length > 4096) throw new Error("Sessão inválida.");
     const clean = {
+      submissionKey: input.submissionKey,
       imageDataUrl: checkImage(input?.imageDataUrl),
-      reporterName: String(input?.reporterName ?? "").trim().slice(0, 80),
+      reporterName: String(input?.reporterName ?? "")
+        .trim()
+        .slice(0, 80),
       reporterEmail: email,
       accessToken: accessToken || undefined,
-      block: String(input?.block ?? "").trim().slice(0, 60),
-      room: String(input?.room ?? "").trim().slice(0, 80),
-      category: String(input?.category ?? "Outros").trim().slice(0, 60),
-      title: String(input?.title ?? "").trim().slice(0, 120),
-      description: String(input?.description ?? "").trim().slice(0, 2000),
+      block: String(input?.block ?? "")
+        .trim()
+        .slice(0, 60),
+      room: String(input?.room ?? "")
+        .trim()
+        .slice(0, 80),
+      category: String(input?.category ?? "Outros")
+        .trim()
+        .slice(0, 60),
+      title: String(input?.title ?? "")
+        .trim()
+        .slice(0, 120),
+      description: String(input?.description ?? "")
+        .trim()
+        .slice(0, 2000),
     };
     if (!clean.block && !clean.room) throw new Error("Informe a localização.");
     if (clean.description.length < 5) throw new Error("Descreva o problema.");
@@ -127,10 +170,24 @@ export const createIncident = createServerFn({ method: "POST" })
     return clean;
   })
   .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from("incidents")
+      .select("id, tracking_token")
+      .eq("submission_key", data.submissionKey)
+      .maybeSingle();
+    if (existingError) throw new Error("Não foi possível verificar um envio anterior.");
+    if (existing) {
+      return {
+        id: existing.id,
+        protocol: existing.id.slice(0, 8).toUpperCase(),
+        token: existing.tracking_token,
+      };
+    }
+
     const { enforceRateLimit } = await import("./rate-limit.server");
     const ipHash = await enforceRateLimit("create");
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const reporter = data.accessToken
       ? await supabaseAdmin.auth.getUser(data.accessToken).then(({ data: result, error }) => {
           if (error || !result.user)
@@ -159,7 +216,9 @@ export const createIncident = createServerFn({ method: "POST" })
     // Learn from the managers: recent tickets whose final priority they confirmed.
     const { data: confirmed } = await supabaseAdmin
       .from("incidents")
-      .select("category, block, title, description, location, ai_priority, priority, manager_priority_note")
+      .select(
+        "category, block, title, description, location, ai_priority, priority, manager_priority_note",
+      )
       .eq("priority_confirmed", true)
       .order("priority_set_at", { ascending: false })
       .limit(300);
@@ -185,6 +244,7 @@ export const createIncident = createServerFn({ method: "POST" })
       .from("incidents")
       .insert({
         user_id: reporter?.id ?? ANONYMOUS_USER_ID,
+        submission_key: data.submissionKey,
         reporter_name:
           (typeof reporter?.user_metadata?.["full_name"] === "string" &&
             reporter.user_metadata["full_name"].trim()) ||
@@ -202,12 +262,28 @@ export const createIncident = createServerFn({ method: "POST" })
         priority: verdict.priority,
         priority_reason: null,
         ai_priority: verdict.priority,
-        ai_priority_reason: verdict.source === "ia" ? verdict.justification : `${verdict.justification} (IA indisponível)`,
+        ai_priority_reason:
+          verdict.source === "ia"
+            ? verdict.justification
+            : `${verdict.justification} (IA indisponível)`,
         priority_confirmed: false,
       })
       .select("id, tracking_token")
       .single();
     if (error) {
+      const { data: duplicate } = await supabaseAdmin
+        .from("incidents")
+        .select("id, tracking_token")
+        .eq("submission_key", data.submissionKey)
+        .maybeSingle();
+      if (duplicate) {
+        await supabaseAdmin.storage.from("incident-photos").remove([photoPath]);
+        return {
+          id: duplicate.id,
+          protocol: duplicate.id.slice(0, 8).toUpperCase(),
+          token: duplicate.tracking_token,
+        };
+      }
       console.error("[incidents] insert failed", error);
       throw new Error("Não foi possível registrar a ocorrência.");
     }
@@ -233,7 +309,9 @@ export const getAccountIncidents = createServerFn({ method: "POST" })
 
     const { data: rows, error } = await supabaseAdmin
       .from("incidents")
-      .select("id, title, description, location, status, created_at, resolved_at, resolution_note, reporter_edited_at")
+      .select(
+        "id, title, description, location, status, created_at, resolved_at, resolution_note, reporter_edited_at",
+      )
       .eq("user_id", authData.user.id)
       .order("created_at", { ascending: false })
       .limit(100);
@@ -255,14 +333,18 @@ export const getAccountIncidents = createServerFn({ method: "POST" })
 /** Public — status of the tickets saved on this device (looked up by their secret tracking tokens). */
 export const getTrackedIncidents = createServerFn({ method: "POST" })
   .inputValidator((input: { tokens: string[] }) => ({
-    tokens: (Array.isArray(input?.tokens) ? input.tokens : []).filter((t) => typeof t === "string" && UUID_RE.test(t)).slice(0, 50),
+    tokens: (Array.isArray(input?.tokens) ? input.tokens : [])
+      .filter((t) => typeof t === "string" && UUID_RE.test(t))
+      .slice(0, 50),
   }))
   .handler(async ({ data }) => {
     if (!data.tokens.length) return [];
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows, error } = await supabaseAdmin
       .from("incidents")
-      .select("id, tracking_token, title, description, location, status, created_at, resolved_at, resolution_note, reporter_edited_at")
+      .select(
+        "id, tracking_token, title, description, location, status, created_at, resolved_at, resolution_note, reporter_edited_at",
+      )
       .in("tracking_token", data.tokens)
       .order("created_at", { ascending: false });
     if (error) throw new Error("Não foi possível carregar seus chamados.");
@@ -292,9 +374,15 @@ type ReporterEditInput = Partial<ReporterEditFields> & {
 export const editReporterIncident = createServerFn({ method: "POST" })
   .inputValidator((input: ReporterEditInput) => {
     const fields = cleanReporterEdit(input ?? {});
-    const trackingToken = typeof input?.trackingToken === "string" && UUID_RE.test(input.trackingToken) ? input.trackingToken : undefined;
+    const trackingToken =
+      typeof input?.trackingToken === "string" && UUID_RE.test(input.trackingToken)
+        ? input.trackingToken
+        : undefined;
     const id = typeof input?.id === "string" && UUID_RE.test(input.id) ? input.id : undefined;
-    const accessToken = typeof input?.accessToken === "string" && input.accessToken.length <= 4096 ? input.accessToken.trim() : "";
+    const accessToken =
+      typeof input?.accessToken === "string" && input.accessToken.length <= 4096
+        ? input.accessToken.trim()
+        : "";
     if (!trackingToken && !(id && accessToken)) throw new Error("Chamado inválido.");
     return { ...fields, trackingToken, id, accessToken };
   })
@@ -303,7 +391,9 @@ export const editReporterIncident = createServerFn({ method: "POST" })
     await enforceRateLimit("edit");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    let query = supabaseAdmin.from("incidents").select("id, title, description, location, status, user_id");
+    let query = supabaseAdmin
+      .from("incidents")
+      .select("id, title, description, location, status, user_id");
     if (data.trackingToken) {
       query = query.eq("tracking_token", data.trackingToken);
     } else {
@@ -313,7 +403,8 @@ export const editReporterIncident = createServerFn({ method: "POST" })
     }
     const { data: current, error: readErr } = await query.maybeSingle();
     if (readErr || !current) throw new Error("Chamado não encontrado.");
-    if (!canReporterEdit(current.status)) throw new Error("Chamados concluídos não podem ser editados.");
+    if (!canReporterEdit(current.status))
+      throw new Error("Chamados concluídos não podem ser editados.");
 
     const changes = diffReporterEdit(current, data);
     if (!changes.length) return { ok: true, changed: false };
@@ -375,7 +466,8 @@ export const getIncidentNotes = createServerFn({ method: "POST" })
 export const updateIncident = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: UpdateIncidentInput) => {
-    if (typeof input?.id !== "string" || !UUID_RE.test(input.id)) throw new Error("Chamado inválido.");
+    if (typeof input?.id !== "string" || !UUID_RE.test(input.id))
+      throw new Error("Chamado inválido.");
     if (input.newNote !== undefined && typeof input.newNote !== "string") {
       throw new Error("Nota inválida.");
     }
@@ -426,11 +518,13 @@ export const updateIncident = createServerFn({ method: "POST" })
         _incident_id: data.id,
         _note: data.newNote,
       });
-      if (noteError) throw new Error("Chamado atualizado, mas não foi possível registrar a nota da equipe.");
+      if (noteError)
+        throw new Error("Chamado atualizado, mas não foi possível registrar a nota da equipe.");
     }
 
     let notified = false;
     const statusChanged = data.status && data.status !== current.status;
+    const completionEventQueued = data.status ? newlyCompleted(current.status, data.status) : false;
     if (statusChanged && (data.notify ?? true) && data.status !== "pendente") {
       const message =
         data.status === "concluido"
@@ -446,7 +540,7 @@ export const updateIncident = createServerFn({ method: "POST" })
         notified = !nErr;
       }
     }
-    return { ok: true, notified };
+    return { ok: true, notified, completionEventQueued };
   });
 
 /** Admin only — delete an incident and remove its private photo from storage. */
@@ -475,10 +569,7 @@ export const deleteIncident = createServerFn({ method: "POST" })
     if (readError) throw new Error("Não foi possível localizar o chamado.");
     if (!incident) throw new Error("Chamado não encontrado.");
 
-    const { error: deleteError } = await supabaseAdmin
-      .from("incidents")
-      .delete()
-      .eq("id", data.id);
+    const { error: deleteError } = await supabaseAdmin.from("incidents").delete().eq("id", data.id);
     if (deleteError) {
       console.error("[incidents] delete failed", deleteError);
       throw new Error("Não foi possível excluir o chamado.");

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   Bell,
   CheckCircle2,
+  CloudUpload,
   Loader2,
   Mic,
   QrCode,
@@ -13,6 +14,8 @@ import {
   ShieldCheck,
   Sparkles,
   Square,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 
 import { CameraView } from "@/components/capture/CameraView";
@@ -51,6 +54,13 @@ import {
   saveReporter,
 } from "@/lib/tracked-tickets";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  blobToDataUrl,
+  dataUrlToBlob,
+  indexedDbDraftStore,
+  syncSubmittedDrafts,
+  type OfflineIncidentDraft,
+} from "@/lib/offline-drafts";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -73,7 +83,7 @@ export const Route = createFileRoute("/")({
   component: CapturePage,
 });
 
-type Step = "camera" | "review" | "done";
+type Step = "camera" | "review" | "queued" | "done";
 
 function CapturePage() {
   const analyze = useServerFn(analyzeIncidentPhoto);
@@ -103,12 +113,199 @@ function CapturePage() {
   const [sentWithEmail, setSentWithEmail] = useState(false);
   const [regeneratingDescription, setRegeneratingDescription] = useState(false);
   const [audioState, setAudioState] = useState<"idle" | "recording" | "transcribing">("idle");
+  const [online, setOnline] = useState(true);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
+  const [pendingSync, setPendingSync] = useState(false);
+  const [queuedForSync, setQueuedForSync] = useState(false);
+  const draftIdRef = useRef("");
+  const draftUserIdRef = useRef<string | null>(null);
+  const restoredDraftRef = useRef(false);
+  const submittedRef = useRef(false);
+  const autosaveRevisionRef = useRef(0);
+  const syncLockRef = useRef(false);
+  const syncAgainRef = useRef(false);
   const titleEditTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const titleRequestSequenceRef = useRef(0);
   const titleWasEditedManuallyRef = useRef(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+
+  const syncQueuedDrafts = useCallback(async () => {
+    if (typeof navigator === "undefined" || !navigator.onLine) return;
+    if (syncLockRef.current) {
+      syncAgainRef.current = true;
+      return;
+    }
+    syncLockRef.current = true;
+    setPendingSync(true);
+    try {
+      const result = await syncSubmittedDrafts(indexedDbDraftStore, async (draft) => {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        const session = sessionData.session;
+        if (draft.accountUserId && session?.user.id !== draft.accountUserId) {
+          throw new Error("Entre na mesma conta usada ao criar este rascunho para enviá-lo.");
+        }
+        const response = await create({
+          data: {
+            submissionKey: draft.id,
+            imageDataUrl: await blobToDataUrl(draft.photo),
+            reporterName: draft.reporterName,
+            reporterEmail: draft.reporterEmail,
+            ...(draft.accountUserId && session ? { accessToken: session.access_token } : {}),
+            block: draft.block,
+            room: draft.room,
+            category: draft.category,
+            title: draft.title,
+            description: draft.description,
+          },
+        });
+        try {
+          addTrackedTicket({
+            token: response.token,
+            protocol: response.protocol,
+            title: draft.title || draft.category,
+            createdAt: new Date().toISOString(),
+          });
+          saveReporter({ name: draft.reporterName.trim(), email: draft.reporterEmail.trim() });
+        } catch (error) {
+          console.error("[offline-drafts] ticket tracking could not be saved", error);
+        }
+        return { response, sentWithEmail: !!draft.reporterEmail.trim() };
+      });
+      setQueuedForSync(result.failed.length > 0);
+
+      const activeSent = result.sent.find(({ id }) => id === draftIdRef.current);
+      if (activeSent) {
+        setProtocol(activeSent.result.response.protocol);
+        setSentWithEmail(activeSent.result.sentWithEmail);
+        submittedRef.current = false;
+        setStep("done");
+      } else if (result.failed.includes(draftIdRef.current)) {
+        setQueuedForSync(true);
+        setStep("queued");
+      }
+    } catch (error) {
+      console.error("[offline-drafts] synchronization failed", error);
+      if (submittedRef.current) setStep("queued");
+    } finally {
+      syncLockRef.current = false;
+      setPendingSync(false);
+      if (syncAgainRef.current && navigator.onLine) {
+        syncAgainRef.current = false;
+        window.setTimeout(() => void syncQueuedDrafts(), 0);
+      }
+    }
+  }, [create]);
+
+  useEffect(() => {
+    let active = true;
+    const handleOnline = () => {
+      setOnline(true);
+      void syncQueuedDrafts();
+    };
+    const handleOffline = () => setOnline(false);
+    setOnline(navigator.onLine);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    void (async () => {
+      const savedDrafts = await indexedDbDraftStore.list();
+      setQueuedForSync(savedDrafts.some((draft) => !!draft.submittedAt));
+      const savedDraft = savedDrafts
+        .filter((draft) => !draft.submittedAt)
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
+      if (!active) return;
+
+      if (savedDraft) {
+        draftIdRef.current = savedDraft.id;
+        draftUserIdRef.current = savedDraft.accountUserId;
+        restoredDraftRef.current = true;
+        setPhoto(await blobToDataUrl(savedDraft.photo));
+        setReporterName(savedDraft.reporterName);
+        setReporterEmail(savedDraft.reporterEmail);
+        setBlock(savedDraft.block as CampusFloor | "");
+        setRoom(savedDraft.room);
+        setCategory(savedDraft.category);
+        setTitle(savedDraft.title);
+        setDescription(savedDraft.description);
+        setStep("review");
+        setDraftSaved(true);
+      } else {
+        draftIdRef.current = crypto.randomUUID();
+        const { data } = await supabase.auth.getSession();
+        draftUserIdRef.current = data.session?.user.id ?? null;
+      }
+      if (!active) return;
+      setDraftReady(true);
+      void syncQueuedDrafts();
+    })().catch((error: unknown) => {
+      console.error("[offline-drafts] could not restore local drafts", error);
+      if (active) {
+        draftIdRef.current ||= crypto.randomUUID();
+        setDraftReady(true);
+        toast.error("Não foi possível acessar os rascunhos salvos neste aparelho.");
+      }
+    });
+
+    return () => {
+      active = false;
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [syncQueuedDrafts]);
+
+  useEffect(() => {
+    if (!draftReady || !photo || !draftIdRef.current || submittedRef.current) return;
+    const revision = ++autosaveRevisionRef.current;
+    const draftId = draftIdRef.current;
+    const accountUserId = draftUserIdRef.current;
+    setDraftSaved(false);
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const draft: OfflineIncidentDraft = {
+            id: draftId,
+            photo: await dataUrlToBlob(photo),
+            reporterName,
+            reporterEmail,
+            accountUserId,
+            block,
+            room: selectedRoom,
+            category,
+            title,
+            description,
+            updatedAt: new Date().toISOString(),
+          };
+          if (revision !== autosaveRevisionRef.current || submittedRef.current) return;
+          await indexedDbDraftStore.put(draft);
+          if (revision === autosaveRevisionRef.current) setDraftSaved(true);
+        } catch (error) {
+          console.error("[offline-drafts] could not save local draft", error);
+          if (revision === autosaveRevisionRef.current) {
+            setDraftSaved(false);
+            toast.error(
+              "Não foi possível salvar o rascunho neste aparelho. Verifique o espaço disponível.",
+            );
+          }
+        }
+      })();
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [
+    block,
+    category,
+    description,
+    draftReady,
+    photo,
+    reporterEmail,
+    reporterName,
+    room,
+    selectedRoom,
+    title,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -122,57 +319,66 @@ function CapturePage() {
     };
   }, []);
 
-  const regenerateDescriptionFromTitle = useCallback(async (nextTitle: string) => {
-    const cleanTitle = nextTitle.trim();
-    if (cleanTitle.length < 2) {
-      titleRequestSequenceRef.current++;
-      setRegeneratingDescription(false);
-      return;
-    }
-
-    const sequence = ++titleRequestSequenceRef.current;
-    setRegeneratingDescription(true);
-    try {
-      const res = await regenerateDescription({
-        data: {
-          category,
-          title: cleanTitle,
-          location: [block, selectedRoom].filter(Boolean).join(" - "),
-        },
-      });
-      if (sequence !== titleRequestSequenceRef.current) return;
-      if (res.ok) {
-        setDescription(res.description);
-        setAiNote(null);
-      } else {
-        setAiNote(res.error);
+  const regenerateDescriptionFromTitle = useCallback(
+    async (nextTitle: string) => {
+      const cleanTitle = nextTitle.trim();
+      if (cleanTitle.length < 2) {
+        titleRequestSequenceRef.current++;
+        setRegeneratingDescription(false);
+        return;
       }
-    } catch {
-      if (sequence === titleRequestSequenceRef.current) {
-        setAiNote("Não foi possível atualizar a descrição. Edite-a manualmente.");
+
+      const sequence = ++titleRequestSequenceRef.current;
+      setRegeneratingDescription(true);
+      try {
+        const res = await regenerateDescription({
+          data: {
+            category,
+            title: cleanTitle,
+            location: [block, selectedRoom].filter(Boolean).join(" - "),
+          },
+        });
+        if (sequence !== titleRequestSequenceRef.current) return;
+        if (res.ok) {
+          setDescription(res.description);
+          setAiNote(null);
+        } else {
+          setAiNote(res.error);
+        }
+      } catch {
+        if (sequence === titleRequestSequenceRef.current) {
+          setAiNote("Não foi possível atualizar a descrição. Edite-a manualmente.");
+        }
+      } finally {
+        if (sequence === titleRequestSequenceRef.current) setRegeneratingDescription(false);
       }
-    } finally {
-      if (sequence === titleRequestSequenceRef.current) setRegeneratingDescription(false);
-    }
-  }, [block, category, regenerateDescription, selectedRoom]);
+    },
+    [block, category, regenerateDescription, selectedRoom],
+  );
 
-  const scheduleTitleDescriptionRegeneration = useCallback((nextTitle: string) => {
-    if (titleEditTimerRef.current) clearTimeout(titleEditTimerRef.current);
-    titleEditTimerRef.current = setTimeout(() => {
-      titleEditTimerRef.current = null;
-      void regenerateDescriptionFromTitle(nextTitle);
-    }, 650);
-  }, [regenerateDescriptionFromTitle]);
+  const scheduleTitleDescriptionRegeneration = useCallback(
+    (nextTitle: string) => {
+      if (titleEditTimerRef.current) clearTimeout(titleEditTimerRef.current);
+      titleEditTimerRef.current = setTimeout(() => {
+        titleEditTimerRef.current = null;
+        void regenerateDescriptionFromTitle(nextTitle);
+      }, 650);
+    },
+    [regenerateDescriptionFromTitle],
+  );
 
-  const finishTitleEdit = useCallback((nextTitle: string) => {
-    if (titleEditTimerRef.current) {
-      clearTimeout(titleEditTimerRef.current);
-      titleEditTimerRef.current = null;
-    }
-    if (titleWasEditedManuallyRef.current) {
-      void regenerateDescriptionFromTitle(nextTitle);
-    }
-  }, [regenerateDescriptionFromTitle]);
+  const finishTitleEdit = useCallback(
+    (nextTitle: string) => {
+      if (titleEditTimerRef.current) {
+        clearTimeout(titleEditTimerRef.current);
+        titleEditTimerRef.current = null;
+      }
+      if (titleWasEditedManuallyRef.current) {
+        void regenerateDescriptionFromTitle(nextTitle);
+      }
+    },
+    [regenerateDescriptionFromTitle],
+  );
 
   function stopAudioCapture() {
     if (mediaRecorderRef.current?.state === "recording") {
@@ -192,8 +398,9 @@ function CapturePage() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType =
-        ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"]
-          .find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
+        ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"].find((type) =>
+          MediaRecorder.isTypeSupported(type),
+        ) ?? "";
       const recorder = mimeType
         ? new MediaRecorder(stream, { mimeType })
         : new MediaRecorder(stream);
@@ -232,7 +439,7 @@ function CapturePage() {
           } else {
             const text = res.text.trim();
             if (text) {
-              setDescription((current) => current.trim() ? `${current.trim()} ${text}` : text);
+              setDescription((current) => (current.trim() ? `${current.trim()} ${text}` : text));
               setAiNote(null);
             } else {
               toast.error("Não foi possível reconhecer fala no áudio.");
@@ -278,8 +485,10 @@ function CapturePage() {
         const user = data.session?.user;
         if (!user) return;
         const metadata = user.user_metadata as { full_name?: string; name?: string };
-        setReporterName(metadata.full_name || metadata.name || saved.name);
-        setReporterEmail(user.email ?? saved.email);
+        if (!restoredDraftRef.current) {
+          setReporterName(metadata.full_name || metadata.name || saved.name);
+          setReporterEmail(user.email ?? saved.email);
+        }
       })
       .catch(() => {
         if (active) toast.error("Não foi possível carregar os dados da sua conta.");
@@ -312,6 +521,11 @@ function CapturePage() {
     setStep("review");
     setAnalyzing(true);
     setAiNote(null);
+    if (!navigator.onLine) {
+      setAiNote("Sem conexão. Preencha o chamado manualmente; ele será salvo neste aparelho.");
+      setAnalyzing(false);
+      return;
+    }
     try {
       const res = await analyze({ data: { imageDataUrl: dataUrl } });
       if (res.ok) {
@@ -347,6 +561,12 @@ function CapturePage() {
   }, []);
 
   function reset() {
+    autosaveRevisionRef.current++;
+    if (!submittedRef.current && draftIdRef.current) {
+      void indexedDbDraftStore.delete(draftIdRef.current).catch((error: unknown) => {
+        console.error("[offline-drafts] could not remove local draft", error);
+      });
+    }
     if (mediaRecorderRef.current?.state === "recording") {
       mediaRecorderRef.current.onstop = null;
       mediaRecorderRef.current.stop();
@@ -363,6 +583,13 @@ function CapturePage() {
     }
     setRegeneratingDescription(false);
     setStep("camera");
+    submittedRef.current = false;
+    setQueuedForSync(false);
+    setDraftSaved(false);
+    draftIdRef.current = crypto.randomUUID();
+    void supabase.auth.getSession().then(({ data }) => {
+      draftUserIdRef.current = data.session?.user.id ?? null;
+    });
     setPhoto(null);
     setTitle("");
     setDescription("");
@@ -386,29 +613,42 @@ function CapturePage() {
     try {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) throw sessionError;
-      const res = await create({
-        data: {
-          imageDataUrl: photo,
-          reporterName,
-          reporterEmail,
-          ...(sessionData.session ? { accessToken: sessionData.session.access_token } : {}),
-          block,
-          room: selectedRoom,
-          category,
-          title,
-          description,
-        },
+      const currentUserId = sessionData.session?.user.id ?? null;
+      if (draftUserIdRef.current && currentUserId !== draftUserIdRef.current) {
+        throw new Error("Entre na mesma conta usada ao criar este rascunho para enviá-lo.");
+      }
+      if (!draftIdRef.current) draftIdRef.current = crypto.randomUUID();
+      if (!draftUserIdRef.current) draftUserIdRef.current = currentUserId;
+      const submittedAt = new Date().toISOString();
+      autosaveRevisionRef.current++;
+      await indexedDbDraftStore.put({
+        id: draftIdRef.current,
+        photo: await dataUrlToBlob(photo),
+        reporterName,
+        reporterEmail,
+        accountUserId: draftUserIdRef.current,
+        block,
+        room: selectedRoom,
+        category,
+        title,
+        description,
+        updatedAt: submittedAt,
+        submittedAt,
       });
-      saveReporter({ name: reporterName.trim(), email: reporterEmail.trim() });
-      addTrackedTicket({
-        token: res.token,
-        protocol: res.protocol,
-        title: title || category,
-        createdAt: new Date().toISOString(),
-      });
-      setProtocol(res.protocol);
-      setSentWithEmail(!!reporterEmail.trim());
-      setStep("done");
+      submittedRef.current = true;
+      setDraftSaved(true);
+      setQueuedForSync(true);
+      setStep("queued");
+      if (!navigator.onLine) {
+        toast.info("Rascunho enviado para sincronização quando a conexão voltar.");
+      } else {
+        await syncQueuedDrafts();
+        if (submittedRef.current) {
+          toast.error(
+            "Não foi possível confirmar o envio. O chamado permanece salvo e será reenviado quando houver conexão.",
+          );
+        }
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível registrar.");
     } finally {
@@ -419,7 +659,9 @@ function CapturePage() {
   return (
     <div className="dark flex h-dvh flex-col bg-background text-foreground">
       <header className="flex items-center justify-between px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <span className="font-display text-sm font-extrabold tracking-tight">Infraestrutura NEM</span>
+        <span className="font-display text-sm font-extrabold tracking-tight">
+          Infraestrutura NEM
+        </span>
         <nav className="flex items-center gap-1">
           <Link
             to="/admin"
@@ -443,6 +685,35 @@ function CapturePage() {
         </nav>
       </header>
 
+      {!online && (
+        <div
+          role="status"
+          className="mx-4 mb-3 flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm"
+        >
+          <WifiOff className="size-4 shrink-0" />
+          Sem conexão. Seus rascunhos ficam salvos neste aparelho.
+        </div>
+      )}
+      {queuedForSync && step !== "queued" && (
+        <div
+          role="status"
+          className="mx-4 mb-3 flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm"
+        >
+          <CloudUpload className="size-4 shrink-0" />
+          Há um envio confirmado aguardando sincronização.
+          {online && (
+            <button
+              type="button"
+              className="ml-auto font-medium text-primary"
+              onClick={() => void syncQueuedDrafts()}
+              disabled={pendingSync}
+            >
+              {pendingSync ? "Enviando…" : "Tentar agora"}
+            </button>
+          )}
+        </div>
+      )}
+
       {step === "camera" && (
         <div className="min-h-0 flex-1">
           <CameraView onCapture={handleCapture} />
@@ -451,6 +722,19 @@ function CapturePage() {
 
       {step === "review" && photo && (
         <form onSubmit={submit} className="min-h-0 flex-1 overflow-y-auto">
+          <div
+            role="status"
+            className="mx-4 mb-3 flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted-foreground"
+          >
+            {online ? (
+              <Wifi className="size-4 shrink-0" />
+            ) : (
+              <WifiOff className="size-4 shrink-0" />
+            )}
+            {draftSaved
+              ? "Rascunho salvo com foto neste aparelho."
+              : "Salvando o rascunho neste aparelho…"}
+          </div>
           <div className="relative mx-4 aspect-[4/3] overflow-hidden rounded-2xl bg-card [container-type:size]">
             <img src={photo} alt="Foto do problema" className="size-full object-cover" />
             {analyzing && (
@@ -682,6 +966,30 @@ function CapturePage() {
         </form>
       )}
 
+      {step === "queued" && (
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
+          <span className="grid size-20 place-items-center rounded-full bg-accent">
+            <CloudUpload className="size-10 text-primary" />
+          </span>
+          <h1 className="text-2xl font-extrabold">Envio pendente de sincronização</h1>
+          <p className="text-muted-foreground">
+            Seu envio foi confirmado e o chamado e a foto estão salvos neste aparelho.{" "}
+            {online
+              ? "Vamos tentar novamente automaticamente."
+              : "Ele será enviado automaticamente quando a conexão voltar."}
+          </p>
+          {online && (
+            <Button size="lg" onClick={() => void syncQueuedDrafts()} disabled={pendingSync}>
+              {pendingSync && <Loader2 className="animate-spin" />}
+              Tentar enviar agora
+            </Button>
+          )}
+          <p className="text-xs text-muted-foreground">
+            O envio só foi autorizado quando você tocou em “Registrar Ocorrência”.
+          </p>
+        </div>
+      )}
+
       {step === "done" && (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
           <span className="grid size-20 place-items-center rounded-full bg-priority-low-soft">
@@ -691,7 +999,9 @@ function CapturePage() {
           <p className="text-muted-foreground">
             A equipe de manutenção já recebeu seu chamado. Acompanhe o andamento em "Meus chamados"
             neste aparelho
-            {sentWithEmail ? " — e avisaremos no seu e-mail quando for resolvido." : "."}
+            {sentWithEmail
+              ? " — se o serviço de e-mail estiver configurado, avisaremos quando for resolvido."
+              : "."}
           </p>
           {protocol && (
             <p className="font-mono text-sm text-muted-foreground">Protocolo #{protocol}</p>
