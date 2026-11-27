@@ -16,16 +16,20 @@ describe("groupCampusLocationsByFloor", () => {
       location("1", "1º ANDAR", null),
       location("2", "1º andar", "Sala 01"),
       location("3", "2º ANDAR", "Auditório"),
-      location("4", "Área Externa", "Quadra"),
-      location("5", "Bloco A 1º ANDAR", "Sala 02"),
-      location("6", "Biblioteca", null),
+      location("4", "BLOCO 1", null),
+      location("5", "BLOCO 1", "GINASIO GRUPONEM"),
+      location("6", "BLOCO 2 ANDA", null),
+      location("7", "BLOCO 2 ANDA", "SALA 24"),
+      location("8", "Área Externa", "Quadra"),
+      location("9", "Bloco A 1º ANDAR", "Sala 02"),
+      location("10", "Biblioteca", null),
     ];
 
     expect(groupCampusLocationsByFloor(locations)).toEqual([
-      ["1º ANDAR", [locations[0], locations[1]]],
-      ["2º ANDAR", [locations[2]]],
+      ["1º ANDAR", [locations[0], locations[1], locations[3], locations[4]]],
+      ["2º ANDAR", [locations[2], locations[5], locations[6]]],
     ]);
-    expect(locations).toHaveLength(6);
+    expect(locations).toHaveLength(10);
   });
 
   it("keeps both floor groups available when no locations are registered", () => {

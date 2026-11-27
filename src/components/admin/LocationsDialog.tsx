@@ -17,7 +17,11 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { locationsQueryKey, useLocations, type CampusLocation } from "@/hooks/use-locations";
 import { supabase } from "@/integrations/supabase/client";
-import { CAMPUS_FLOORS, groupCampusLocationsByFloor } from "@/lib/campus-location-groups";
+import {
+  CAMPUS_FLOORS,
+  campusFloorForBlock,
+  groupCampusLocationsByFloor,
+} from "@/lib/campus-location-groups";
 import { campusLocationKey, parseCampusLocationFile, type ImportedCampusLocation } from "@/lib/campus-location-import";
 
 /** Staff: register the campus floors and rooms offered in the report form. */
@@ -43,11 +47,15 @@ export function LocationsDialog() {
     }
     setBusy(true);
     const rows: { block: string; room: string | null }[] = [];
+    const existingBlock =
+      all.find((location) => location.block.trim().toLocaleUpperCase("pt-BR") === b)?.block ??
+      all.find((location) => campusFloorForBlock(location.block) === b)?.block;
+    const targetBlock = existingBlock ?? b;
     // A room in a new floor also registers the floor itself.
-    if (r && !all.some((location) => location.block.trim().toLocaleUpperCase("pt-BR") === b)) {
-      rows.push({ block: b, room: null });
+    if (r && !all.some((location) => location.block === targetBlock)) {
+      rows.push({ block: targetBlock, room: null });
     }
-    rows.push({ block: b, room: r || null });
+    rows.push({ block: targetBlock, room: r || null });
     const { error } = await supabase.from("locations").insert(rows);
     setBusy(false);
     if (error) {
@@ -110,6 +118,26 @@ export function LocationsDialog() {
   async function setActive(id: string, active: boolean) {
     const { error } = await supabase.from("locations").update({ active }).eq("id", id);
     if (error) toast.error("Não foi possível alterar o local.");
+    refresh();
+  }
+
+  async function setFloorActive(heads: CampusLocation[], active: boolean) {
+    const { error } = await supabase
+      .from("locations")
+      .update({ active })
+      .in(
+        "id",
+        heads.map((head) => head.id),
+      );
+    if (error) toast.error("Não foi possível alterar o local.");
+    refresh();
+  }
+
+  async function removeFloor(floor: string, items: CampusLocation[]) {
+    if (!window.confirm(`Excluir ${floor} e todas as salas dele? Chamados já registrados não são afetados.`)) return;
+    const blocks = Array.from(new Set(items.map((location) => location.block)));
+    const { error } = await supabase.from("locations").delete().in("block", blocks);
+    if (error) toast.error("Não foi possível excluir o local.");
     refresh();
   }
 
@@ -187,16 +215,22 @@ export function LocationsDialog() {
 
         <div className="space-y-4">
           {grouped.map(([b, items]) => {
-            const head = items.find((l) => !l.room);
+            const heads = items.filter((l) => !l.room);
             const rooms = items.filter((l) => l.room);
             return (
               <section key={b} className="rounded-xl border">
                 <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
                   <p className="font-semibold">{b}</p>
                   <div className="flex items-center gap-2">
-                    {head && <Switch checked={head.active} onCheckedChange={(v) => setActive(head.id, v)} aria-label={`Ativar ${b}`} />}
-                    {head && (
-                      <Button variant="ghost" size="icon" onClick={() => remove(head)} aria-label={`Excluir ${b}`}>
+                    {heads.length > 0 && (
+                      <Switch
+                        checked={heads.every((head) => head.active)}
+                        onCheckedChange={(active) => setFloorActive(heads, active)}
+                        aria-label={`Ativar ${b}`}
+                      />
+                    )}
+                    {heads.length > 0 && (
+                      <Button variant="ghost" size="icon" onClick={() => removeFloor(b, items)} aria-label={`Excluir ${b}`}>
                         <Trash2 />
                       </Button>
                     )}
@@ -218,7 +252,7 @@ export function LocationsDialog() {
                   </ul>
                 ) : (
                   <p className="px-3 py-2 text-xs text-muted-foreground">
-                    {head
+                    {heads.length > 0
                       ? "Sem salas cadastradas — quem reporta digita o local."
                       : "Nenhum local cadastrado neste andar."}
                   </p>
