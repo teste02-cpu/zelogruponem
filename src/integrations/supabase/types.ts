@@ -1,462 +1,510 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.18"
-  }
+    PostgrestVersion: "14.18";
+  };
   public: {
     Tables: {
       incident_edits: {
         Row: {
-          changes: Json
-          created_at: string
-          id: string
-          incident_id: string
-        }
+          changes: Json;
+          created_at: string;
+          id: string;
+          incident_id: string;
+        };
         Insert: {
-          changes: Json
-          created_at?: string
-          id?: string
-          incident_id: string
-        }
+          changes: Json;
+          created_at?: string;
+          id?: string;
+          incident_id: string;
+        };
         Update: {
-          changes?: Json
-          created_at?: string
-          id?: string
-          incident_id?: string
-        }
+          changes?: Json;
+          created_at?: string;
+          id?: string;
+          incident_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "incident_edits_incident_id_fkey"
-            columns: ["incident_id"]
-            isOneToOne: false
-            referencedRelation: "incidents"
-            referencedColumns: ["id"]
+            foreignKeyName: "incident_edits_incident_id_fkey";
+            columns: ["incident_id"];
+            isOneToOne: false;
+            referencedRelation: "incidents";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       incident_notes: {
         Row: {
-          author_id: string | null
-          created_at: string
-          id: string
-          incident_id: string
-          note: string
-        }
+          author_id: string | null;
+          created_at: string;
+          id: string;
+          incident_id: string;
+          note: string;
+        };
         Insert: {
-          author_id?: string | null
-          created_at?: string
-          id?: string
-          incident_id: string
-          note: string
-        }
+          author_id?: string | null;
+          created_at?: string;
+          id?: string;
+          incident_id: string;
+          note: string;
+        };
         Update: {
-          author_id?: string | null
-          created_at?: string
-          id?: string
-          incident_id?: string
-          note?: string
-        }
+          author_id?: string | null;
+          created_at?: string;
+          id?: string;
+          incident_id?: string;
+          note?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "incident_notes_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            foreignKeyName: "incident_notes_author_id_fkey";
+            columns: ["author_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "incident_notes_incident_id_fkey"
-            columns: ["incident_id"]
-            isOneToOne: false
-            referencedRelation: "incidents"
-            referencedColumns: ["id"]
+            foreignKeyName: "incident_notes_incident_id_fkey";
+            columns: ["incident_id"];
+            isOneToOne: false;
+            referencedRelation: "incidents";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       incidents: {
         Row: {
-          ai_priority: Database["public"]["Enums"]["incident_priority"] | null
-          ai_priority_reason: string | null
-          assigned_to: string | null
-          assigned_to_name: string | null
-          block: string | null
-          category: string
-          created_at: string
-          description: string
-          id: string
-          location: string
-          manager_priority_note: string | null
-          photo_path: string | null
-          priority: Database["public"]["Enums"]["incident_priority"]
-          priority_confirmed: boolean
-          priority_reason: string | null
-          priority_set_at: string | null
-          priority_set_by: string | null
-          reporter_edit_seen: boolean
-          reporter_edited_at: string | null
-          reporter_email: string | null
-          reporter_ip_hash: string | null
-          reporter_name: string
-          resolution_note: string | null
-          resolved_at: string | null
-          status: Database["public"]["Enums"]["incident_status"]
-          title: string
-          tracking_token: string
-          updated_at: string
-          user_id: string
-        }
+          ai_priority: Database["public"]["Enums"]["incident_priority"] | null;
+          ai_priority_reason: string | null;
+          assigned_to: string | null;
+          assigned_to_name: string | null;
+          block: string | null;
+          category: string;
+          created_at: string;
+          description: string;
+          id: string;
+          location: string;
+          manager_priority_note: string | null;
+          photo_path: string | null;
+          priority: Database["public"]["Enums"]["incident_priority"];
+          priority_confirmed: boolean;
+          priority_reason: string | null;
+          priority_set_at: string | null;
+          priority_set_by: string | null;
+          reporter_edit_seen: boolean;
+          reporter_edited_at: string | null;
+          reporter_email: string | null;
+          reporter_ip_hash: string | null;
+          reporter_name: string;
+          submission_key: string | null;
+          resolution_note: string | null;
+          resolved_at: string | null;
+          status: Database["public"]["Enums"]["incident_status"];
+          title: string;
+          tracking_token: string;
+          updated_at: string;
+          user_id: string;
+        };
         Insert: {
-          ai_priority?: Database["public"]["Enums"]["incident_priority"] | null
-          ai_priority_reason?: string | null
-          assigned_to?: string | null
-          assigned_to_name?: string | null
-          block?: string | null
-          category: string
-          created_at?: string
-          description: string
-          id?: string
-          location: string
-          manager_priority_note?: string | null
-          photo_path?: string | null
-          priority?: Database["public"]["Enums"]["incident_priority"]
-          priority_confirmed?: boolean
-          priority_reason?: string | null
-          priority_set_at?: string | null
-          priority_set_by?: string | null
-          reporter_edit_seen?: boolean
-          reporter_edited_at?: string | null
-          reporter_email?: string | null
-          reporter_ip_hash?: string | null
-          reporter_name: string
-          resolution_note?: string | null
-          resolved_at?: string | null
-          status?: Database["public"]["Enums"]["incident_status"]
-          title: string
-          tracking_token?: string
-          updated_at?: string
-          user_id?: string
-        }
+          ai_priority?: Database["public"]["Enums"]["incident_priority"] | null;
+          ai_priority_reason?: string | null;
+          assigned_to?: string | null;
+          assigned_to_name?: string | null;
+          block?: string | null;
+          category: string;
+          created_at?: string;
+          description: string;
+          id?: string;
+          location: string;
+          manager_priority_note?: string | null;
+          photo_path?: string | null;
+          priority?: Database["public"]["Enums"]["incident_priority"];
+          priority_confirmed?: boolean;
+          priority_reason?: string | null;
+          priority_set_at?: string | null;
+          priority_set_by?: string | null;
+          reporter_edit_seen?: boolean;
+          reporter_edited_at?: string | null;
+          reporter_email?: string | null;
+          reporter_ip_hash?: string | null;
+          reporter_name: string;
+          submission_key?: string | null;
+          resolution_note?: string | null;
+          resolved_at?: string | null;
+          status?: Database["public"]["Enums"]["incident_status"];
+          title: string;
+          tracking_token?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
         Update: {
-          ai_priority?: Database["public"]["Enums"]["incident_priority"] | null
-          ai_priority_reason?: string | null
-          assigned_to?: string | null
-          assigned_to_name?: string | null
-          block?: string | null
-          category?: string
-          created_at?: string
-          description?: string
-          id?: string
-          location?: string
-          manager_priority_note?: string | null
-          photo_path?: string | null
-          priority?: Database["public"]["Enums"]["incident_priority"]
-          priority_confirmed?: boolean
-          priority_reason?: string | null
-          priority_set_at?: string | null
-          priority_set_by?: string | null
-          reporter_edit_seen?: boolean
-          reporter_edited_at?: string | null
-          reporter_email?: string | null
-          reporter_ip_hash?: string | null
-          reporter_name?: string
-          resolution_note?: string | null
-          resolved_at?: string | null
-          status?: Database["public"]["Enums"]["incident_status"]
-          title?: string
-          tracking_token?: string
-          updated_at?: string
-          user_id?: string
-        }
+          ai_priority?: Database["public"]["Enums"]["incident_priority"] | null;
+          ai_priority_reason?: string | null;
+          assigned_to?: string | null;
+          assigned_to_name?: string | null;
+          block?: string | null;
+          category?: string;
+          created_at?: string;
+          description?: string;
+          id?: string;
+          location?: string;
+          manager_priority_note?: string | null;
+          photo_path?: string | null;
+          priority?: Database["public"]["Enums"]["incident_priority"];
+          priority_confirmed?: boolean;
+          priority_reason?: string | null;
+          priority_set_at?: string | null;
+          priority_set_by?: string | null;
+          reporter_edit_seen?: boolean;
+          reporter_edited_at?: string | null;
+          reporter_email?: string | null;
+          reporter_ip_hash?: string | null;
+          reporter_name?: string;
+          submission_key?: string | null;
+          resolution_note?: string | null;
+          resolved_at?: string | null;
+          status?: Database["public"]["Enums"]["incident_status"];
+          title?: string;
+          tracking_token?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "incidents_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            foreignKeyName: "incidents_assigned_to_fkey";
+            columns: ["assigned_to"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "incidents_priority_set_by_fkey"
-            columns: ["priority_set_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            foreignKeyName: "incidents_priority_set_by_fkey";
+            columns: ["priority_set_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       locations: {
         Row: {
-          active: boolean
-          block: string
-          created_at: string
-          id: string
-          room: string | null
-        }
+          active: boolean;
+          block: string;
+          created_at: string;
+          id: string;
+          room: string | null;
+        };
         Insert: {
-          active?: boolean
-          block: string
-          created_at?: string
-          id?: string
-          room?: string | null
-        }
+          active?: boolean;
+          block: string;
+          created_at?: string;
+          id?: string;
+          room?: string | null;
+        };
         Update: {
-          active?: boolean
-          block?: string
-          created_at?: string
-          id?: string
-          room?: string | null
-        }
-        Relationships: []
-      }
+          active?: boolean;
+          block?: string;
+          created_at?: string;
+          id?: string;
+          room?: string | null;
+        };
+        Relationships: [];
+      };
       notifications: {
         Row: {
-          created_at: string
-          id: string
-          incident_id: string | null
-          message: string
-          read: boolean
-          user_id: string
-        }
+          created_at: string;
+          id: string;
+          incident_id: string | null;
+          message: string;
+          read: boolean;
+          user_id: string;
+        };
         Insert: {
-          created_at?: string
-          id?: string
-          incident_id?: string | null
-          message: string
-          read?: boolean
-          user_id: string
-        }
+          created_at?: string;
+          id?: string;
+          incident_id?: string | null;
+          message: string;
+          read?: boolean;
+          user_id: string;
+        };
         Update: {
-          created_at?: string
-          id?: string
-          incident_id?: string | null
-          message?: string
-          read?: boolean
-          user_id?: string
-        }
+          created_at?: string;
+          id?: string;
+          incident_id?: string | null;
+          message?: string;
+          read?: boolean;
+          user_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "notifications_incident_id_fkey"
-            columns: ["incident_id"]
-            isOneToOne: false
-            referencedRelation: "incidents"
-            referencedColumns: ["id"]
+            foreignKeyName: "notifications_incident_id_fkey";
+            columns: ["incident_id"];
+            isOneToOne: false;
+            referencedRelation: "incidents";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
+      notification_outbox: {
+        Row: {
+          attempt_count: number;
+          channel: "email" | "whatsapp";
+          created_at: string;
+          event_type: "new_incident" | "overdue" | "completed";
+          id: string;
+          idempotency_key: string;
+          incident_id: string;
+          last_error: string | null;
+          locked_until: string | null;
+          next_attempt_at: string;
+          recipient_email: string;
+          sent_at: string | null;
+        };
+        Insert: {
+          attempt_count?: number;
+          channel?: "email" | "whatsapp";
+          created_at?: string;
+          event_type: "new_incident" | "overdue" | "completed";
+          id?: string;
+          idempotency_key: string;
+          incident_id: string;
+          last_error?: string | null;
+          locked_until?: string | null;
+          next_attempt_at?: string;
+          recipient_email: string;
+          sent_at?: string | null;
+        };
+        Update: {
+          attempt_count?: number;
+          channel?: "email" | "whatsapp";
+          created_at?: string;
+          event_type?: "new_incident" | "overdue" | "completed";
+          id?: string;
+          idempotency_key?: string;
+          incident_id?: string;
+          last_error?: string | null;
+          locked_until?: string | null;
+          next_attempt_at?: string;
+          recipient_email?: string;
+          sent_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notification_outbox_incident_id_fkey";
+            columns: ["incident_id"];
+            isOneToOne: false;
+            referencedRelation: "incidents";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
-          created_at: string
-          email: string | null
-          full_name: string
-          id: string
-        }
+          created_at: string;
+          email: string | null;
+          full_name: string;
+          id: string;
+        };
         Insert: {
-          created_at?: string
-          email?: string | null
-          full_name?: string
-          id: string
-        }
+          created_at?: string;
+          email?: string | null;
+          full_name?: string;
+          id: string;
+        };
         Update: {
-          created_at?: string
-          email?: string | null
-          full_name?: string
-          id?: string
-        }
-        Relationships: []
-      }
+          created_at?: string;
+          email?: string | null;
+          full_name?: string;
+          id?: string;
+        };
+        Relationships: [];
+      };
       request_log: {
         Row: {
-          created_at: string
-          id: number
-          ip_hash: string
-          kind: string
-        }
+          created_at: string;
+          id: number;
+          ip_hash: string;
+          kind: string;
+        };
         Insert: {
-          created_at?: string
-          id?: number
-          ip_hash: string
-          kind: string
-        }
+          created_at?: string;
+          id?: number;
+          ip_hash: string;
+          kind: string;
+        };
         Update: {
-          created_at?: string
-          id?: number
-          ip_hash?: string
-          kind?: string
-        }
-        Relationships: []
-      }
+          created_at?: string;
+          id?: number;
+          ip_hash?: string;
+          kind?: string;
+        };
+        Relationships: [];
+      };
       user_roles: {
         Row: {
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
+          id: string;
+          role: Database["public"]["Enums"]["app_role"];
+          user_id: string;
+        };
         Insert: {
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
+          id?: string;
+          role: Database["public"]["Enums"]["app_role"];
+          user_id: string;
+        };
         Update: {
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
-      }
-    }
+          id?: string;
+          role?: Database["public"]["Enums"]["app_role"];
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+    };
     Views: {
-      [_ in never]: never
-    }
+      [_ in never]: never;
+    };
     Functions: {
       add_incident_note: {
-        Args: { _incident_id: string; _note: string }
-        Returns: string
-      }
+        Args: { _incident_id: string; _note: string };
+        Returns: string;
+      };
       has_role: {
         Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
-      is_staff: { Args: { _user_id: string }; Returns: boolean }
-    }
+          _role: Database["public"]["Enums"]["app_role"];
+          _user_id: string;
+        };
+        Returns: boolean;
+      };
+      is_staff: { Args: { _user_id: string }; Returns: boolean };
+      claim_notification_outbox: {
+        Args: { _limit?: number };
+        Returns: Database["public"]["Tables"]["notification_outbox"]["Row"][];
+      };
+    };
     Enums: {
-      app_role: "admin" | "maintenance" | "user"
-      incident_priority: "alta" | "media" | "baixa"
-      incident_status: "pendente" | "em_andamento" | "concluido"
-    }
+      app_role: "admin" | "maintenance" | "user";
+      incident_priority: "alta" | "media" | "baixa";
+      incident_status: "pendente" | "em_andamento" | "concluido";
+    };
     CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-}
+      [_ in never]: never;
+    };
+  };
+};
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">];
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
+      Row: infer R;
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R;
       }
       ? R
       : never
-    : never
+    : never;
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
+      Insert: infer I;
     }
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
+        Insert: infer I;
       }
       ? I
       : never
-    : never
+    : never;
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
+      Update: infer U;
     }
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
+        Update: infer U;
       }
       ? U
       : never
-    : never
+    : never;
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
   EnumName extends (DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+    : never;
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof DatabaseWithoutInternals },
+    keyof DefaultSchema["CompositeTypes"] | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+    : never;
 
 export const Constants = {
   public: {
@@ -466,4 +514,4 @@ export const Constants = {
       incident_status: ["pendente", "em_andamento", "concluido"],
     },
   },
-} as const
+} as const;
