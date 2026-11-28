@@ -9,6 +9,7 @@ import {
   CloudUpload,
   Loader2,
   Mic,
+  Pencil,
   QrCode,
   RotateCcw,
   ShieldCheck,
@@ -19,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { CameraView } from "@/components/capture/CameraView";
+import { PhotoEditor } from "@/components/capture/PhotoEditor";
 import { QrScannerDialog } from "@/components/capture/QrScannerDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,6 +97,7 @@ function CapturePage() {
   const { roomsOfFloor } = useLocations();
   const [step, setStep] = useState<Step>("camera");
   const [photo, setPhoto] = useState<string | null>(null);
+  const [editingPhoto, setEditingPhoto] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [aiNote, setAiNote] = useState<string | null>(null);
   const [reporterName, setReporterName] = useState("");
@@ -591,6 +594,7 @@ function CapturePage() {
       draftUserIdRef.current = data.session?.user.id ?? null;
     });
     setPhoto(null);
+    setEditingPhoto(false);
     setTitle("");
     setDescription("");
     setCategory("Outros");
@@ -748,12 +752,31 @@ function CapturePage() {
             )}
             <button
               type="button"
+              onClick={() => setEditingPhoto(true)}
+              className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-background/85 px-3 py-1.5 text-sm"
+            >
+              <Pencil className="size-4" /> Editar foto
+            </button>
+            <button
+              type="button"
               onClick={reset}
               className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-background/85 px-3 py-1.5 text-sm"
             >
               <RotateCcw className="size-4" /> Refazer
             </button>
           </div>
+
+          {editingPhoto && (
+            <PhotoEditor
+              original={photo}
+              onCancel={() => setEditingPhoto(false)}
+              onConfirm={async (editedPhoto) => {
+                setPhoto(await blobToDataUrl(editedPhoto));
+                setEditingPhoto(false);
+                toast.success("Foto editada e pronta para envio.");
+              }}
+            />
+          )}
 
           <div className="space-y-4 px-4 pb-32 pt-5">
             {aiNote && (
