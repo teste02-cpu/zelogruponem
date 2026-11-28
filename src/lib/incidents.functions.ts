@@ -431,6 +431,7 @@ type UpdateIncidentInput = {
   priorityNote?: string | null;
   status?: IncidentStatus;
   assignedTo?: string | null;
+  assignedToName?: string | null;
   newNote?: string;
   notify?: boolean;
 };
@@ -477,7 +478,27 @@ export const updateIncident = createServerFn({ method: "POST" })
     if (input.priority && !["alta", "media", "baixa"].includes(input.priority)) {
       throw new Error("Prioridade inválida.");
     }
-    return { ...input, newNote: normalizeIncidentNote(input.newNote) ?? "" };
+    if (
+      input.assignedTo !== undefined &&
+      input.assignedTo !== null &&
+      (typeof input.assignedTo !== "string" || !UUID_RE.test(input.assignedTo))
+    ) {
+      throw new Error("Responsável inválido.");
+    }
+    if (
+      input.assignedToName !== undefined &&
+      input.assignedToName !== null &&
+      (typeof input.assignedToName !== "string" ||
+        input.assignedToName.trim().length < 1 ||
+        input.assignedToName.trim().length > 120)
+    ) {
+      throw new Error("Nome do responsável inválido.");
+    }
+    const assignedToName = input.assignedToName?.trim() || null;
+    if (input.assignedTo && assignedToName) {
+      throw new Error("Selecione uma pessoa cadastrada ou informe um nome.");
+    }
+    return { ...input, assignedToName, newNote: normalizeIncidentNote(input.newNote) ?? "" };
   })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -494,6 +515,7 @@ export const updateIncident = createServerFn({ method: "POST" })
     const patch: {
       status?: IncidentStatus;
       assigned_to?: string | null;
+      assigned_to_name?: string | null;
       priority?: "alta" | "media" | "baixa";
       priority_confirmed?: boolean;
       priority_set_by?: string;
@@ -508,7 +530,10 @@ export const updateIncident = createServerFn({ method: "POST" })
       patch.manager_priority_note = data.priorityNote?.trim().slice(0, 1000) || null;
     }
     if (data.status) patch.status = data.status;
-    if (data.assignedTo !== undefined) patch.assigned_to = data.assignedTo;
+    if (data.assignedTo !== undefined) {
+      patch.assigned_to = data.assignedTo;
+      patch.assigned_to_name = data.assignedToName ?? null;
+    }
 
     const { error } = await supabase.from("incidents").update(patch).eq("id", data.id);
     if (error) throw new Error("Não foi possível atualizar o chamado.");

@@ -81,6 +81,7 @@ export type Database = {
           ai_priority: Database["public"]["Enums"]["incident_priority"] | null;
           ai_priority_reason: string | null;
           assigned_to: string | null;
+          assigned_to_name: string | null;
           block: string | null;
           category: string;
           created_at: string;
@@ -112,6 +113,7 @@ export type Database = {
           ai_priority?: Database["public"]["Enums"]["incident_priority"] | null;
           ai_priority_reason?: string | null;
           assigned_to?: string | null;
+          assigned_to_name?: string | null;
           block?: string | null;
           category: string;
           created_at?: string;
@@ -143,6 +145,7 @@ export type Database = {
           ai_priority?: Database["public"]["Enums"]["incident_priority"] | null;
           ai_priority_reason?: string | null;
           assigned_to?: string | null;
+          assigned_to_name?: string | null;
           block?: string | null;
           category?: string;
           created_at?: string;

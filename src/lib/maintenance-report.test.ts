@@ -36,6 +36,7 @@ function row(id: string, overrides: Partial<IncidentRow> = {}): IncidentRow {
     photo_path: "private-photo-path",
     status: "pendente",
     assigned_to: null,
+    assigned_to_name: null,
     priority: "alta",
     priority_confirmed: false,
     priority_reason: null,
