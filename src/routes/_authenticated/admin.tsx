@@ -21,6 +21,7 @@ import {
   splitRecurrences,
 } from "@/lib/recurrence-dismiss";
 import { adminIncidentsOptions } from "@/lib/admin-incidents";
+import { getIncidentAssigneeName } from "@/lib/incident-assignee";
 
 import { IncidentCard } from "@/components/admin/IncidentCard";
 import { IncidentDetailSheet } from "@/components/admin/IncidentDetailSheet";
@@ -138,7 +139,6 @@ function AdminDashboard() {
     };
   }, [qc]);
 
-  const staffName = useMemo(() => Object.fromEntries(staff.map((s) => [s.id, s.name])), [staff]);
   const { data: urls = {} } = useSignedUrls(incidents.map((i) => i.photo_path));
 
   const filtered = useMemo(() => {
@@ -409,7 +409,7 @@ function AdminDashboard() {
                         key={i.id}
                         incident={i}
                         photoUrl={i.photo_path ? urls[i.photo_path] : undefined}
-                        assigneeName={i.assigned_to ? staffName[i.assigned_to] : undefined}
+                        assigneeName={getIncidentAssigneeName(i.assigned_to, i.assigned_to_name, staff)}
                         onOpen={() => setOpenId(i.id)}
                       />
                     ))}
@@ -430,7 +430,7 @@ function AdminDashboard() {
                 key={i.id}
                 incident={i}
                 photoUrl={i.photo_path ? urls[i.photo_path] : undefined}
-                assigneeName={i.assigned_to ? staffName[i.assigned_to] : undefined}
+                assigneeName={getIncidentAssigneeName(i.assigned_to, i.assigned_to_name, staff)}
                 onOpen={() => setOpenId(i.id)}
                 showStatus
               />

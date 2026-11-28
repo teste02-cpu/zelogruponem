@@ -9,7 +9,7 @@ function row(id: string, overrides: Partial<IncidentRow> = {}): IncidentRow {
     id, title: "Pintura descascada", description: "Parede danificada", category: "Pintura e Acabamento",
     created_at: "2026-11-24T12:00:00Z", updated_at: "2026-11-24T12:00:00Z", location: "Bloco A - Sala 1", block: "Bloco A",
     user_id: "u1", reporter_name: "Marcelo", reporter_email: "marcelo@example.test", reporter_ip_hash: "private-ip-hash",
-    tracking_token: "private-tracking-token", photo_path: "private-photo-path", status: "pendente", assigned_to: null,
+    tracking_token: "private-tracking-token", photo_path: "private-photo-path", status: "pendente", assigned_to: null, assigned_to_name: null,
     priority: "alta", priority_confirmed: false, priority_reason: null, priority_set_at: null, priority_set_by: null,
     ai_priority: "alta", ai_priority_reason: null, manager_priority_note: null,
     reporter_edit_seen: true, reporter_edited_at: null, resolution_note: null, resolved_at: null, ...overrides,

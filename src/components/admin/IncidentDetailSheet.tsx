@@ -20,13 +20,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { deleteIncident, getIncidentNotes, updateIncident } from "@/lib/incidents.functions";
 import { PRIORITY_LABEL, STATUS_LABEL, type IncidentStatus } from "@/lib/incident-meta";
 import { orderIncidentNotes } from "@/lib/incident-notes";
+import { resolveIncidentAssignee } from "@/lib/incident-assignee";
 import type { Priority } from "@/lib/priority";
 import { cn } from "@/lib/utils";
 import { ReporterEditsSection } from "./ReporterEditsSection";
@@ -54,7 +55,8 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, isAdmin, onOpen
   const loadNotes = useServerFn(getIncidentNotes);
   const qc = useQueryClient();
   const [status, setStatus] = useState<IncidentStatus>("pendente");
-  const [assignee, setAssignee] = useState<string>("none");
+  const [assigneeValue, setAssigneeValue] = useState("");
+  const [preservedAssigneeId, setPreservedAssigneeId] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [notify, setNotify] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -62,6 +64,7 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, isAdmin, onOpen
   const [priorityNote, setPriorityNote] = useState("");
   const [deleting, setDeleting] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
+  const assigneeIncidentId = useRef<string | null>(null);
   const incidentId = incident?.id;
   const {
     data: notesData = [],
@@ -80,12 +83,29 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, isAdmin, onOpen
   useEffect(() => {
     if (!incident) return;
     setStatus(incident.status);
-    setAssignee(incident.assigned_to ?? "none");
     setNote("");
     setNotify(true);
     setPriority(incident.priority);
     setPriorityNote(incident.manager_priority_note ?? "");
   }, [incident]);
+
+  useEffect(() => {
+    if (!incident) {
+      assigneeIncidentId.current = null;
+      return;
+    }
+    const incidentChanged = assigneeIncidentId.current !== incident.id;
+    if (!incidentChanged && !preservedAssigneeId) return;
+
+    const assignedStaff = staff.find((member) => member.id === incident.assigned_to);
+    setAssigneeValue(incident.assigned_to_name ?? assignedStaff?.name ?? "");
+    setPreservedAssigneeId(
+      incident.assigned_to && !assignedStaff && !incident.assigned_to_name
+        ? incident.assigned_to
+        : null,
+    );
+    assigneeIncidentId.current = incident.id;
+  }, [incident, staff, preservedAssigneeId]);
 
   useEffect(() => {
     const timeline = timelineRef.current;
@@ -96,11 +116,13 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, isAdmin, onOpen
     if (!incident) return;
     setSaving(true);
     try {
+      const assignee = resolveIncidentAssignee(assigneeValue, staff);
       const res = await update({
         data: {
           id: incident.id,
           status,
-          assignedTo: assignee === "none" ? null : assignee,
+          assignedTo: preservedAssigneeId ?? assignee.assignedToId,
+          assignedToName: assignee.assignedToName,
           newNote: note.trim(),
           notify,
           ...(priority !== incident.priority || !incident.priority_confirmed || priorityNote !== (incident.manager_priority_note ?? "")
@@ -257,20 +279,24 @@ export function IncidentDetailSheet({ incident, photoUrl, staff, isAdmin, onOpen
               </div>
 
               <div className="space-y-2">
-                <Label>Responsável</Label>
-                <Select value={assignee} onValueChange={setAssignee}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Atribuir a…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sem responsável</SelectItem>
-                    {staff.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="maintenance-assignee">Responsável pela manutenção</Label>
+                <Input
+                  id="maintenance-assignee"
+                  list="maintenance-staff-options"
+                  value={assigneeValue}
+                  maxLength={120}
+                  onChange={(event) => {
+                    setAssigneeValue(event.currentTarget.value);
+                    setPreservedAssigneeId(null);
+                  }}
+                  placeholder="Selecione ou digite um nome"
+                  autoComplete="off"
+                />
+                <datalist id="maintenance-staff-options">
+                  {staff.map((member) => (
+                    <option key={member.id} value={member.name} />
+                  ))}
+                </datalist>
               </div>
 
               <div className="space-y-2">
