@@ -16,6 +16,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { supabase } from "@/integrations/supabase/client";
 
+const CACHE_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -130,17 +132,36 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
+    let active = true;
+    let cleanupInterval: ReturnType<typeof window.setInterval> | undefined;
     if ("serviceWorker" in navigator) {
-      void navigator.serviceWorker.register("/sw.js").catch((error: unknown) => {
-        console.error("[pwa] service worker registration failed", error);
-      });
+      const requestCacheCleanup = () => {
+        void navigator.serviceWorker.ready
+          .then((registration) => {
+            if (active) registration.active?.postMessage({ type: "CLEANUP_CACHES" });
+          })
+          .catch((error: unknown) => {
+            console.error("[pwa] cache cleanup request failed", error);
+          });
+      };
+      void navigator.serviceWorker
+        .register("/sw.js")
+        .then(requestCacheCleanup)
+        .catch((error: unknown) => {
+          console.error("[pwa] service worker registration failed", error);
+        });
+      cleanupInterval = window.setInterval(requestCacheCleanup, CACHE_CLEANUP_INTERVAL_MS);
     }
     const { data } = supabase.auth.onAuthStateChange((event) => {
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
       router.invalidate();
       if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
     });
-    return () => data.subscription.unsubscribe();
+    return () => {
+      active = false;
+      if (cleanupInterval !== undefined) window.clearInterval(cleanupInterval);
+      data.subscription.unsubscribe();
+    };
   }, [router, queryClient]);
 
   return (
